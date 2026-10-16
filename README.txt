@@ -1,0 +1,1 @@
+Edge Lab offline app. Upload every file in this folder to a free GitHub Pages site (see instructions in the chat). Open the site once in Safari, then Share > Add to Home Screen. After that it works with no connection.
