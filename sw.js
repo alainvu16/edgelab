@@ -1,14 +1,26 @@
-// Edge Lab offline cache: everything is stored on first visit, then served even with no connection.
-var CACHE = 'edgelab-37ab3a59';
+// Edge Lab offline cache. Online: the app page always comes fresh from the site, so updates show on the next open.
+// Offline: everything is served from the copy saved on this phone.
+var CACHE = 'edgelab-71fa530c';
 var ASSETS = ["./", "index.html", "manifest.json", "icon-180.png", "icon-512.png", "worker.js", "chess.js", "core.js", "content.js", "engine.js", "puzzles.js", "chess-app.js", "xq-engine.js", "xq.js", "poker.js", "mktdata.js", "tapedata.js", "momentum.js", "wisdom.js", "think.js", "macro.js", "tape.js", "markets.js", "roadmap.js"];
-self.addEventListener('install', function (e) { e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(ASSETS); }).then(function () { return self.skipWaiting(); })); });
+self.addEventListener('install', function (e) {
+  // cache: 'reload' skips the browser's own short-term cache, so an update never saves old files
+  e.waitUntil(caches.open(CACHE).then(function (c) { return Promise.all(ASSETS.map(function (u) { return fetch(new Request(u, { cache: 'reload' })).then(function (r) { if (r.ok) return c.put(u, r); }); })); }).then(function () { return self.skipWaiting(); }));
+});
 self.addEventListener('activate', function (e) { e.waitUntil(caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); })); }).then(function () { return self.clients.claim(); })); });
+function fresh(req) { return fetch(new Request(req, { cache: 'no-store' })); }
 self.addEventListener('fetch', function (e) {
   var u = new URL(e.request.url);
   if (u.origin !== location.origin) { e.respondWith(fetch(e.request).catch(function () { return new Response('', { status: 204 }); })); return; }
-  // app files: cache first (instant + offline), refresh the cache in the background when online
-  e.respondWith(caches.open(CACHE).then(function (c) { return c.match(e.request, { ignoreSearch: true }).then(function (hit) {
-    var net = fetch(e.request).then(function (r) { if (r && r.ok) c.put(e.request, r.clone()); return r; }).catch(function () { return hit; });
-    return hit || net;
-  }); }));
+  if (e.request.mode === 'navigate' || /[.]js$/.test(u.pathname) || u.pathname.slice(-1) === '/' || /index[.]html$/.test(u.pathname)) {
+    // network first (3 s limit), saved copy if offline or slow
+    e.respondWith(caches.open(CACHE).then(function (c) {
+      var net = fresh(e.request).then(function (r) { if (r && r.ok) c.put(e.request, r.clone()); return r; });
+      var timer = new Promise(function (res) { setTimeout(res, 3000); });
+      return Promise.race([net.catch(function () { return null; }), timer]).then(function (r) {
+        return r || c.match(e.request, { ignoreSearch: true }).then(function (hit) { return hit || net; });
+      });
+    }));
+    return;
+  }
+  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(function (hit) { return hit || fetch(e.request); }));
 });

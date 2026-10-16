@@ -94,9 +94,20 @@ var App = (function () {
         else done(false);
       };
       $('#dl', v).onclick = function () {
-        try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([code], { type: 'text/plain' })); a.download = 'edge-lab-backup-' + new Date().toISOString().slice(0, 10) + '.txt'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
-        catch (e) { toast('Use Copy backup code instead.'); }
+        var name = 'edge-lab-backup-' + new Date().toISOString().slice(0, 10) + '.txt';
+        // Inside Claude the page can't download directly: ask the app to save the file (it shows a confirmation).
+        var dlp = (window.claude && window.claude.use) ? window.claude.use('downloads') : Promise.resolve(null);
+        dlp.then(function (dl) {
+          if (dl) return dl.save({ filename: name, data: code }).then(function () { toast('Backup file saved. In the other app, tap Load backup file.'); }, function (e) {
+            var c = e && e.code; toast(c === 'declined' ? 'Save cancelled.' : c === 'rate_limited' ? 'One moment, then try again.' : 'Couldn’t save the file here. Use Copy backup code instead.');
+          });
+          plainDownload(name);
+        }, function () { plainDownload(name); });
       };
+      function plainDownload(name) {
+        try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([code], { type: 'text/plain' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+        catch (e) { toast('Use Copy backup code instead.'); }
+      }
       function tryRestore(text) {
         var res = readCode(text);
         if (res.err) { $('#rsm', v).textContent = res.err; return; }
