@@ -78,26 +78,35 @@ var App = (function () {
       v.innerHTML = '<div><span class="eyebrow">Your progress</span><h1>Backups</h1><p class="mute small">Your progress saves on every answer. On top of that, Edge Lab keeps a copy for each of the last 10 days on this phone' + (cloudDoc ? ', 7 daily copies in your account,' : '') + ' and a safety copy before any reset or restore. You can also keep your own backup code anywhere (Notes, email).</p></div>' +
         (saveFail ? '<div class="coach wrong"><p>This phone’s storage is full, so saving here failed. Free some space or save a backup code now.</p></div>' : '') +
         '<div class="panel"><h3>Backup code</h3><p class="small mute">Copy this and paste it into Notes. Paste it back below to restore on any device, even the offline version.</p><div class="btns"><button class="btn primary" id="cp">Copy backup code</button><button class="btn" id="dl">Save as file</button></div><textarea id="code" rows="3" readonly style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px;font:12px var(--mono, monospace)"></textarea></div>' +
-        '<div class="panel"><h3>Restore from a code</h3><textarea id="in" rows="3" placeholder="Paste a backup code" style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px;font:12px var(--mono, monospace)"></textarea><button class="btn" id="rs">Restore this code</button><p class="small" id="rsm"></p></div>' +
+        '<div class="panel"><h3>Restore from a code</h3><textarea id="in" rows="3" placeholder="Paste a backup code" style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px;font:12px var(--mono, monospace)"></textarea><div class="btns"><button class="btn primary" id="rs">Restore this code</button><label class="btn" style="cursor:pointer">Load backup file<input type="file" id="fl" accept=".txt,text/plain" hidden></label></div><p class="small" id="rsm"></p></div>' +
         '<h3>Saved copies</h3><div class="list" id="bl">' + (list.length ? list.map(function (b, i) { return '<button class="item" data-b="' + i + '"><span class="grow"><span class="t">' + esc(fmtAt(b.at)) + '</span><br><span class="s">' + esc(b.why === 'daily' ? 'Daily copy' : 'Safety copy, ' + b.why) + ' · ' + (+b.score || 0) + ' things done</span></span><span class="end">Restore</span></button>'; }).join('') : '<p class="mute small">Copies appear after your first answers.</p>') + '</div>' +
         (cloudDoc ? '<button class="btn sm ghost" id="cl">Show account copies</button><div class="list" id="cll"></div>' : '');
-      var code = 'EDGE1:' + btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+      var code = makeCode(S);
       $('#code', v).value = code;
       $('#cp', v).onclick = function () {
-        var ta = $('#code', v); ta.focus(); ta.select();
+        var ta = $('#code', v), done = function (ok) { toast(ok ? 'Copied (' + code.length + ' characters, ends with .END). Paste it into Notes.' : 'Press and hold the code, Select All, then Copy.'); };
+        // iPhone: a read-only box can't be selected, so unlock it for the copy
+        ta.removeAttribute('readonly'); ta.focus(); ta.setSelectionRange(0, code.length);
         var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
-        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(function () { toast('Backup code copied. Paste it into Notes.'); }, function () { if (!ok) toast('Select the code above and copy it.'); });
-        else toast(ok ? 'Backup code copied. Paste it into Notes.' : 'Select the code above and copy it.');
+        ta.setAttribute('readonly', ''); ta.blur();
+        if (ok) return done(true);
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(function () { done(true); }, function () { done(false); });
+        else done(false);
       };
       $('#dl', v).onclick = function () {
         try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([code], { type: 'text/plain' })); a.download = 'edge-lab-backup-' + new Date().toISOString().slice(0, 10) + '.txt'; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
         catch (e) { toast('Use Copy backup code instead.'); }
       };
-      $('#rs', v).onclick = function () {
-        var t = ($('#in', v).value || '').trim(), st = null;
-        try { if (t.indexOf('EDGE1:') === 0) t = decodeURIComponent(escape(atob(t.slice(6)))); st = JSON.parse(t); } catch (e) { st = null; }
-        if (!validState(st)) { $('#rsm', v).textContent = 'That code isn’t a valid Edge Lab backup. Copy the whole code and try again.'; return; }
-        confirmRestore(st, progressScore(st));
+      function tryRestore(text) {
+        var res = readCode(text);
+        if (res.err) { $('#rsm', v).textContent = res.err; return; }
+        $('#rsm', v).textContent = '';
+        confirmRestore(res.state, progressScore(res.state));
+      }
+      $('#rs', v).onclick = function () { tryRestore($('#in', v).value || ''); };
+      $('#fl', v).onchange = function () {
+        var f = this.files && this.files[0]; if (!f) return;
+        var rd = new FileReader(); rd.onload = function () { tryRestore(String(rd.result || '')); }; rd.onerror = function () { $('#rsm', v).textContent = 'Couldn’t open that file. Try pasting the code instead.'; }; rd.readAsText(f);
       };
       $$('[data-b]', v).forEach(function (b) { b.onclick = function () { var x = list[+b.dataset.b]; if (x && validState(x.state)) confirmRestore(x.state, x.score); }; });
       if (cloudDoc) $('#cl', v).onclick = function () {
@@ -109,6 +118,25 @@ var App = (function () {
         });
       };
     });
+  }
+  // Backup code: EDGE1:<base64 of your progress>.END  (the .END lets us spot a code that got cut off when copying)
+  function makeCode(s) { return 'EDGE1:' + btoa(unescape(encodeURIComponent(JSON.stringify(s)))) + '.END'; }
+  function readCode(text) {
+    var t = String(text || '');
+    var i = t.indexOf('EDGE1:');
+    if (i < 0) {
+      var j = t.indexOf('{'); // a raw backup file also works
+      if (j >= 0) { try { var raw = JSON.parse(t.slice(j)); if (validState(raw)) return { state: raw }; } catch (e) {} }
+      return { err: t.trim() ? 'That isn’t an Edge Lab backup code: it should start with EDGE1: . Your phone may have pasted something else. Copy the code again and paste it here.' : 'Paste your backup code in the box first.' };
+    }
+    t = t.slice(i + 6);
+    var k = t.indexOf('.END'), complete = k >= 0;
+    if (complete) t = t.slice(0, k);
+    t = t.replace(/[^A-Za-z0-9+\/=]/g, ''); // drop spaces, line breaks and stray characters added by Notes or Messages
+    var st = null;
+    try { st = JSON.parse(decodeURIComponent(escape(atob(t)))); } catch (e) { st = null; }
+    if (validState(st)) return { state: st };
+    return { err: complete ? 'That code is damaged. Copy a fresh code from the other app and try again.' : 'That code is cut off: the full code ends with .END. Copy the whole code again (or use Save as file / Load backup file).' };
   }
   function confirmRestore(st, sc) {
     modal('<h2>Restore this copy?</h2><p class="mute">It has ' + (+sc || 0) + ' things done; you have ' + progressScore(S) + ' now. Your current progress is saved as a safety copy first, so you can switch back.</p><div class="btns"><button class="btn" id="no">Cancel</button><button class="btn primary" id="yes">Restore</button></div>');
@@ -561,7 +589,7 @@ var App = (function () {
   }
 
   return {
-    backupScreen: backupScreen, idkBtn: idkBtn, snapshot: snapshot, validState: validState,
+    backupScreen: backupScreen, idkBtn: idkBtn, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
     st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
