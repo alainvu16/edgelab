@@ -87,6 +87,43 @@ p{margin:0}
 .pill.bad{color:var(--bad);border-color:var(--bad)}
 .pill.acc{color:var(--accent);border-color:var(--accent)}
 .stat{display:flex;flex-direction:column;gap:2px}
+/* front: hero cockpit */
+.hero{position:relative;overflow:hidden;border-radius:20px;padding:18px 16px 16px;border:1px solid var(--line);background:radial-gradient(120% 90% at 100% 0%,color-mix(in srgb,var(--accent) 16%,transparent),transparent 60%),linear-gradient(180deg,var(--panel),var(--bg));display:flex;flex-direction:column;gap:12px;isolation:isolate}
+.hero::before{content:"";position:absolute;inset:0;z-index:-1;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:28px 28px;opacity:.35;mask-image:linear-gradient(180deg,#000,transparent 75%);-webkit-mask-image:linear-gradient(180deg,#000,transparent 75%)}
+.hband{display:flex;flex-direction:column;gap:4px;margin:2px -16px 0}
+.hcap{display:flex;justify-content:space-between;font-size:11px;color:var(--mute);padding:0 16px}
+.hcap .up{color:var(--good)}.hcap .dn{color:var(--bad)}
+.hspark{display:block;width:100%;height:58px;pointer-events:none}
+.hrow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hchip{font:600 11px var(--mono);letter-spacing:.04em;color:var(--accent);border:1px solid color-mix(in srgb,var(--accent) 45%,transparent);border-radius:99px;padding:3px 9px;white-space:nowrap}
+.htitle{font-size:34px;line-height:1.02;letter-spacing:-.025em}
+.htitle span{color:var(--accent)}
+.hsub{font-size:12px;color:var(--mute)}
+.dials{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:6px}
+.dial{background:none;border:0;color:var(--fg);display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0;cursor:pointer;min-width:0}
+.dial .ring{position:relative;width:58px;height:58px}
+.dial svg{width:100%;height:100%;transform:rotate(-90deg)}
+.dial circle{fill:color-mix(in srgb,var(--bg) 70%,transparent);stroke-width:4}
+.dial .trk{stroke:var(--line)}
+.dial .val{stroke:var(--accent);stroke-linecap:round;fill:none;transition:stroke-dashoffset .9s ease}
+.dial .g{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--chess);font-size:24px;line-height:1}
+.dial .g.han{font-family:var(--han);font-weight:700;font-size:20px}
+.dial .dl{font:600 12px var(--body)}
+.dial .ds{font-size:11px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.dial:active .ring{transform:scale(.94)}
+.hqp{padding:15px;font-size:17px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 8px 24px -10px color-mix(in srgb,var(--accent) 70%,transparent)}
+.hqp span{font:500 12px var(--body);opacity:.85}
+/* launch mark */
+#splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;animation:spOut .35s ease .95s forwards;pointer-events:none}
+#splash .mk{display:flex;flex-direction:column;align-items:center;gap:14px}
+#splash svg{width:132px;height:72px}
+#splash path{fill:none;stroke:var(--accent);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:200;stroke-dashoffset:200;animation:spDraw .8s ease-out .1s forwards}
+#splash .wm{font-family:var(--display);font-weight:800;font-size:26px;letter-spacing:-.01em;opacity:0;animation:spFade .4s ease .45s forwards}
+#splash .wm b{color:var(--accent)}
+@keyframes spDraw{to{stroke-dashoffset:0}}
+@keyframes spFade{to{opacity:1}}
+@keyframes spOut{to{opacity:0;visibility:hidden}}
+@media (prefers-reduced-motion:reduce){#splash{display:none}.dial .val{transition:none}}
 .stat .v{font-family:var(--mono);font-size:22px;font-variant-numeric:tabular-nums}
 .stat .k{font-size:12px;color:var(--mute)}
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:12px 10px}
@@ -186,6 +223,7 @@ p{margin:0}
 .grab{width:40px;height:4px;border-radius:4px;background:var(--line);align-self:center}
 </style>
 
+<div id="splash" aria-hidden="true"><div class="mk"><svg viewBox="0 0 132 72"><path d="M4 60 L30 46 L46 52 L70 26 L86 34 L128 6"/></svg><div class="wm">Edge<b>Lab</b></div></div></div>
 <div id="app">
   <header class="top" id="top"></header>
   <main id="main"><div class="wrap" id="view"></div></main>
@@ -199,24 +237,24 @@ p{margin:0}
 </div>
 <div id="modal"></div>
 
-<script src="chess.js?v=21"></script>
-<script src="core.js?v=21"></script>
-<script src="content.js?v=21"></script>
-<script src="engine.js?v=21"></script>
-<script src="puzzles.js?v=21"></script>
-<script src="chess-app.js?v=21"></script>
-<script src="xq-engine.js?v=21"></script>
-<script src="xq.js?v=21"></script>
-<script src="poker.js?v=21"></script>
-<script src="mktdata.js?v=21"></script>
-<script src="tapedata.js?v=21"></script>
-<script src="momentum.js?v=21"></script>
-<script src="wisdom.js?v=21"></script>
-<script src="think.js?v=21"></script>
-<script src="macro.js?v=21"></script>
-<script src="tape.js?v=21"></script>
-<script src="markets.js?v=21"></script>
-<script src="roadmap.js?v=21"></script>
+<script src="chess.js?v=22"></script>
+<script src="core.js?v=22"></script>
+<script src="content.js?v=22"></script>
+<script src="engine.js?v=22"></script>
+<script src="puzzles.js?v=22"></script>
+<script src="chess-app.js?v=22"></script>
+<script src="xq-engine.js?v=22"></script>
+<script src="xq.js?v=22"></script>
+<script src="poker.js?v=22"></script>
+<script src="mktdata.js?v=22"></script>
+<script src="tapedata.js?v=22"></script>
+<script src="momentum.js?v=22"></script>
+<script src="wisdom.js?v=22"></script>
+<script src="think.js?v=22"></script>
+<script src="macro.js?v=22"></script>
+<script src="tape.js?v=22"></script>
+<script src="markets.js?v=22"></script>
+<script src="roadmap.js?v=22"></script>
 <script>
 window.addEventListener('error', function (e) {
   try {
@@ -227,5 +265,6 @@ window.addEventListener('error', function (e) {
   } catch (x) {}
 });
 App.boot();
-if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(function () {}); }</script>
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(function () {}); }
+setTimeout(function () { var sp = document.getElementById('splash'); if (sp) sp.remove(); }, 1500);</script>
 </body></html>

@@ -513,9 +513,8 @@ var App = (function () {
       var sug = suggestion();
       var ss = S.session;
       v.innerHTML =
-        '<div><span class="eyebrow">' + greet + ', Alain' + (S.streakDays > 1 ? ' · ' + S.streakDays + '-day streak' : '') + '</span><h1>Train your edge.</h1></div>' +
+        frontHTML(greet) +
         (progressScore(S) === 0 ? '<button class="item" id="rsc"><span class="grow"><span class="t">Moving from another device?</span><br><span class="s">Paste your backup code to bring your progress here.</span></span><span class="end">›</span></button>' : '') +
-        '<button class="btn primary" id="qp" style="padding:16px;font-size:17px;display:flex;flex-direction:column;align-items:center;gap:2px">' + (QP.active ? 'Resume quick play' : 'Quick play') + '<span style="font:500 12px var(--body);opacity:.85">The app picks what you need most and rotates every few minutes</span></button>' +
         (QP.active ? '<div class="row"><button class="btn sm ghost" id="qpstop">Stop quick play</button></div>' : '') +
         (typeof RM !== 'undefined' ? '<button class="item" id="path" style="flex-direction:column;align-items:stretch;gap:6px"><div class="row"><span class="t grow">Your path to an edge</span><span class="end">›</span></div>' + RM.summary().map(function (r) { return '<div class="row small"><span style="width:62px">' + r.name + '</span><div class="bar grow"><i style="width:' + Math.round(r.pct * 100) + '%"></i></div><span class="mute" style="width:118px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.done ? 'Edge reached' : r.stageName) + '</span></div>'; }).join('') + '</button>' : '') +
         (ss.active ? '' : '<div class="panel"><h3>Start a session</h3><p class="mute small">Set a time box so you train sharp and stop before you burn out.</p><div class="btns">' +
@@ -551,6 +550,41 @@ var App = (function () {
         $('#yes').onclick = function () { snapshot(true, 'before reset'); S = defaults(); App.S = S; save(); if (cloudDoc) cloudPush(); closeModal(); home(); };
       };
     });
+  }
+  // ---------- the front: hero "cockpit" ----------
+  function sparkPath() {
+    try {
+      var px = (MKT_DATA.monthly.px.SPY || []).filter(function (x) { return x != null; }).slice(-48);
+      if (px.length < 8) return '';
+      var lo = Math.min.apply(null, px), hi = Math.max.apply(null, px), n = px.length;
+      var pts = px.map(function (v, i) { return [(i / (n - 1) * 100).toFixed(2), (36 - (v - lo) / (hi - lo || 1) * 30).toFixed(2)]; });
+      var line = 'M' + pts.map(function (p) { return p.join(','); }).join(' L');
+      var chg = (px[n - 1] / px[0] - 1) * 100;
+      return '<div class="hband"><div class="hcap mono"><span>S&amp;P 500 · last 4 years</span><span class="' + (chg >= 0 ? 'up' : 'dn') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(0) + '%</span></div><svg class="hspark" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><path d="' + line + ' L100,40 L0,40 Z" fill="url(#hg)"/><path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg></div>';
+    } catch (e) { return ''; }
+  }
+  function dial(k, glyph, label, stat, pct, han) {
+    var R = 25, C = 2 * Math.PI * R, off = C * (1 - Math.max(0.02, Math.min(1, pct)));
+    return '<button class="dial" data-go="' + k + '" aria-label="' + label + ', ' + stat + '"><span class="ring"><svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="' + R + '" class="trk"/><circle cx="30" cy="30" r="' + R + '" class="val" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/></svg><span class="g' + (han ? ' han' : '') + '">' + glyph + '</span></span><span class="dl">' + label + '</span><span class="ds mono">' + stat + '</span></button>';
+  }
+  function frontHTML(greet) {
+    var path = {}; try { RM.summary().forEach(function (r) { path[r.k] = r.pct; }); } catch (e) {}
+    var m = S.mkt || {}, today = m.today || 0, goal = m.goal || 15, hrs = 0; try { hrs = App.totalHours(); } catch (e) {}
+    var elo = '—'; try { elo = CZ.estElo().elo; } catch (e) {}
+    var xel = 'Lv ' + ((S.xq && S.xq.level) || 1); try { if (XQ.estElo) xel = XQ.estElo().elo; } catch (e) {}
+    var streak = S.streakDays > 1 ? '<span class="hchip">' + S.streakDays + '-day streak</span>' : '<span class="hchip">Day one</span>';
+    return '<section class="hero">' +
+      '<div class="hrow"><span class="eyebrow">' + greet + ', Alain</span>' + streak + '</div>' +
+      '<h1 class="htitle">Train your <span>edge</span>.</h1>' +
+      '<p class="hsub mono">' + Math.min(today, 999) + '/' + goal + ' market questions today · ' + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
+      '<div class="dials">' +
+        dial('mkt', '↗', 'Markets', 'Lv ' + (m.level || 1), path.mkt || 0) +
+        dial('chess', '&#9822;&#xFE0E;', 'Chess', elo, path.chess || 0) +
+        dial('poker', '&#9824;&#xFE0E;', 'Poker', 'Lv ' + ((S.poker && S.poker.level) || 1), path.poker || 0) +
+        dial('xq', '炮', 'Xiangqi', xel, path.xq || 0, true) +
+      '</div>' +
+      '<button class="btn primary hqp" id="qp">' + (QP.active ? 'Resume quick play' : 'Quick play') + '<span>The app picks what you need most and rotates every few minutes</span></button>' +
+      '</section>';
   }
   function item(go, ic, t, s) {
     return '<button class="item" data-go="' + go + '"><span style="font-family:' + (ic === '炮' ? 'var(--han)' : 'var(--chess)') + ';font-size:24px;width:28px;text-align:center">' + ic + '</span><span class="grow"><span class="t">' + t + '</span><br><span class="s">' + s + '</span></span><span class="end">›</span></button>';
