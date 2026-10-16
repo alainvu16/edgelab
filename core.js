@@ -576,7 +576,7 @@ var App = (function () {
     return '<section class="hero">' +
       '<div class="hrow"><span class="eyebrow">' + greet + ', Alain</span>' + streak + '</div>' +
       '<h1 class="htitle">Train your <span>edge</span>.</h1>' +
-      '<p class="hsub mono">' + Math.min(today, 999) + '/' + goal + ' market questions today · ' + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
+      '<p class="hsub mono">' + (today >= goal ? Math.min(today, 999) + ' questions today · goal hit · ' : today + '/' + goal + ' questions today · ') + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
       '<div class="dials">' +
         dial('mkt', '↗', 'Markets', 'Lv ' + (m.level || 1), path.mkt || 0) +
         dial('chess', '&#9822;&#xFE0E;', 'Chess', elo, path.chess || 0) +
