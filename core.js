@@ -149,7 +149,7 @@ var App = (function () {
   }
   function deviceInfo() {
     var vv = window.visualViewport;
-    return { screen: screen.width + 'x' + screen.height, view: innerWidth + 'x' + innerHeight, vv: vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) : '', app: !!navigator.standalone,
+    return { screen: window.screen.width + 'x' + window.screen.height, view: innerWidth + 'x' + innerHeight, vv: vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) : '', app: !!navigator.standalone,
       ua: navigator.userAgent, version: (document.querySelector('script[src*="core.js"]') || {}).src || '', errors: (window.__errs || []).slice(-15) };
   }
   function ghFetchRemote() {
