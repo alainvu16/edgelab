@@ -1,7 +1,7 @@
 // Edge Lab offline cache. Online: the app page always comes fresh from the site, so updates show on the next open.
 // Offline: everything is served from the copy saved on this phone.
-var CACHE = 'edgelab-edge1017-57';
-var ASSETS = ["./", "index.html", "manifest.json", "icon-180.png", "icon-512.png", "worker.js", "chess.js", "core.js", "glossary.js", "content.js", "distract.js", "engine.js", "puzzles.js", "chess-app.js", "xq-engine.js", "xq.js", "poker.js", "mktdata.js", "tapedata.js", "momentum.js", "sages.js", "wisdom.js", "think.js", "math.js", "edge.js", "macro.js", "tape.js", "tonebot.js", "markets.js", "roadmap.js"];
+var CACHE = 'edgelab-street1017-58';
+var ASSETS = ["./", "index.html", "manifest.json", "icon-180.png", "icon-512.png", "worker.js", "chess.js", "core.js", "glossary.js", "content.js", "distract.js", "engine.js", "puzzles.js", "chess-app.js", "xq-engine.js", "xq.js", "poker.js", "mktdata.js", "tapedata.js", "momentum.js", "sages.js", "wisdom.js", "think.js", "math.js", "streetdata.js", "street.js", "edge.js", "macro.js", "tape.js", "tonebot.js", "markets.js", "roadmap.js"];
 self.addEventListener('install', function (e) {
   // cache: 'reload' skips the browser's own short-term cache, so an update never saves old files
   e.waitUntil(caches.open(CACHE).then(function (c) { return Promise.all(ASSETS.map(function (u) { return fetch(new Request(u, { cache: 'reload' })).then(function (r) { if (r.ok) return c.put(u, r); }); })); }).then(function () { return self.skipWaiting(); }));

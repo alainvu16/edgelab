@@ -424,12 +424,15 @@ var App = (function () {
       '<div class="btns">' + opts.map(function (m) { return '<button class="btn' + (ss.active && ss.limit === m ? ' primary' : '') + '" data-m="' + m + '">' + m + ' min</button>'; }).join('') + '</div>' +
       '<h3>Market breaks</h3><p class="mute small">A short trading quiz after every stretch of play.</p>' +
       '<div class="seg" id="bev">' + [8, 12, 20, 0].map(function (m) { return '<button aria-pressed="' + (S.breakEvery === m) + '" data-b="' + m + '">' + (m ? 'Every ' + m + ' min' : 'Off') + '</button>'; }).join('') + '</div>' +
+      '<h3>Full-day nudge</h3><p class="mute small">In quick play, once a day after this many answers, a suggestion to stop for the day.</p>' +
+      '<div class="seg" id="fdn">' + [120, 180, 250, 0].map(function (m) { var cur = S.fullDay == null ? 180 : S.fullDay; return '<button aria-pressed="' + (cur === m) + '" data-fd="' + m + '">' + (m ? m + ' answers' : 'Off') + '</button>'; }).join('') + '</div>' +
       (sampleFn ? '<h3>Explain like I’m 5</h3><div class="seg" id="simps">' + [['off', 'Button only'], ['wrong', 'When I’m wrong'], ['always', 'Always']].map(function (o) { return '<button aria-pressed="' + ((S.simple || 'wrong') === o[0]) + '" data-sm="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><p class="mute small">Rewrites coach notes in kid-simple words using Claude (needs a connection).</p>' : '') +
       '<h3>Celebrations</h3><div class="seg" id="fxs"><button aria-pressed="' + (S.fx !== false) + '" data-fx="1">On</button><button aria-pressed="' + (S.fx === false) + '" data-fx="0">Off</button></div><p class="mute small">After wins and level-ups: dollar bills, poker chips, gold chess pieces and xiangqi discs rain down. Tap On to preview.</p>' +
       (ss.active ? '<button class="btn ghost" id="endS">End session now</button>' : '') +
       '<button class="btn ghost" id="cls">Close</button>');
     $$('#modal [data-m]').forEach(function (b) { b.onclick = function () { startSession(+b.dataset.m); closeModal(); }; });
     $$('#modal [data-b]').forEach(function (b) { b.onclick = function () { S.breakEvery = +b.dataset.b; save(); sessionSheet(); }; });
+    $$('#modal [data-fd]').forEach(function (b) { b.onclick = function () { S.fullDay = +b.dataset.fd; save(); sessionSheet(); }; });
     $$('#modal [data-sm]').forEach(function (b) { b.onclick = function () { S.simple = b.dataset.sm; save(); sessionSheet(); }; });
     $$('#modal [data-fx]').forEach(function (b) { b.onclick = function () { S.fx = b.dataset.fx === '1'; save(); sessionSheet(); if (S.fx) celebrate('level'); }; });
     if ($('#endS')) $('#endS').onclick = function () { closeModal(); timesUp(true); };
@@ -471,7 +474,7 @@ var App = (function () {
 
   // ---------- quick play: the app picks what to train and rotates ----------
   var QP = { active: false, count: 0, quota: 1, start: 0, last: null, lastLabel: '', blocks: {}, n: 0 };
-  var QNAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', vocab: 'Vocabulary', words: 'Words to Know', think: 'Think outside the box', sage: 'Metaphor Match', math: 'Quick Math' };
+  var QNAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', vocab: 'Vocabulary', words: 'Words to Know', think: 'Think outside the box', sage: 'Metaphor Match', math: 'Quick Math', street: 'Street Smarts' };
   function qname(k) { return QNAME[k] || 'Training'; }
   // Edge check: the first blocks go to the most-faded subjects (EG.rank), harder where it can be
   var QP_KEY = { words: 'words', quotes: 'sage', math: 'math' };
@@ -482,6 +485,7 @@ var App = (function () {
     else if (k === 'words') a = (typeof WZ !== 'undefined' && WZ.dueCount() > 0) || typeof GL === 'undefined' ? { k: 'vocab', label: 'Word Duel review', go: function () { WZ.vocab(); } } : { k: 'words', label: 'Words to Know', go: function () { GL.drill(); } };
     else if (k === 'math') a = { k: 'math', label: 'Quick Math, every question on the clock', go: function () { MM.drill({ allTimed: true }); } };
     else if (k === 'quotes') a = { k: 'sage', label: 'Quotes: question me', go: WZ.sageQuiz };
+    else if (k === 'street') a = { k: 'street', label: 'Street Smarts', go: ST.quiz };
     if (!a) return null;
     a.edge = true; a.why = nm + ' faded the most since you last trained it. Re-testing it first brings your edge back fastest.'; a.label = 'Edge check · ' + a.label;
     return a;
@@ -493,6 +497,8 @@ var App = (function () {
     if (QP.n > 0 && QP.n % 4 === 3 && due >= 2 && QP.last !== 'vocab') return { k: 'vocab', label: 'Vocabulary review', why: due + ' words are due before they fade.', go: function () { WZ.vocab(); }, quota: 1 };
     // jargon: the words you tapped or missed get drilled for real, in the area you're training most
     if (QP.n > 0 && QP.n % 3 === 2 && QP.last !== 'words' && typeof GL !== 'undefined' && (GL.dueCount() > 0 || QP.n % 6 === 2)) { var ga = Math.floor(QP.n / 3) % 2 ? 'Everyday' : ({ poker: 'Poker', mkt: 'Trading', chess: 'Chess', xq: 'Xiangqi' }[QP.lastK] || 'Poker'); /* every other words slot: everyday vocabulary */ return { k: 'words', label: 'Words to Know: ' + ga, why: GL.dueCount() ? GL.dueCount() + ' words you tapped or missed, drilled until they stick.' : (ga === 'Everyday' ? 'Sophisticated everyday words: 10 quick ones.' : 'Learn the language of the game: 10 quick words.'), go: function () { GL.drill(ga); }, quota: 1 }; }
+    // street smarts (real situations, learn by doing): every 6th block
+    if (QP.n > 0 && QP.n % 6 === 3 && QP.last !== 'street' && typeof ST !== 'undefined' && ST.ALL.length) return { k: 'street', label: 'Street Smarts', why: 'Real situations: negotiating, scams, people and thinking traps. You choose, then the why.', go: ST.quiz, quota: 1 };
     // quick mental math (stocks + everyday): every 5th block
     if (QP.n > 0 && QP.n % 5 === 1 && QP.last !== 'math' && typeof MM !== 'undefined') return { k: 'math', label: 'Quick Math', why: 'Ten fast ones: stock math and mental sharpeners, some against the clock.', go: MM.drill, quota: 1 };
     // quotes you earned: questioned on them every 7th block once there are enough to quiz
@@ -692,8 +698,9 @@ var App = (function () {
     if (b.dataset.qpt === 'stop') { qpStop(); tab('home'); } else if (box) box.remove();
   }, true);
   // which subject a graded answer belongs to: the tab for the four games, the screen for the daily games
-  var SUBJ_BY_TITLE = { 'Vocabulary': 'words', 'Words to know': 'words', 'Words to Know': 'words', 'Question me': 'quotes', 'Quick Math': 'math' };
-  function subjNow() { if (['chess', 'xq', 'poker', 'mkt'].indexOf(curTab) >= 0) return curTab; var top = stack[stack.length - 1]; return top ? SUBJ_BY_TITLE[top.title] || '' : ''; }
+  var SUBJ_BY_TITLE = { 'Vocabulary': 'words', 'Words to know': 'words', 'Words to Know': 'words', 'Question me': 'quotes', 'Quick Math': 'math', 'Street Smarts': 'street' };
+  function setSubj(k) { var top = stack[stack.length - 1]; if (top) top.subj = k; } // mixed rounds (mastery, monthly test) say which subject each question is
+  function subjNow() { var top = stack[stack.length - 1]; if (top && top.subj) return top.subj; if (['chess', 'xq', 'poker', 'mkt'].indexOf(curTab) >= 0) return curTab; return top ? SUBJ_BY_TITLE[top.title] || '' : ''; }
   function answersToday() { return S && S.daily && S.daily.d === dayKey(new Date()) ? S.daily.n : 0; }
   function coachHTML(grade, text, extra) {
     var counted = grade && grade !== 'info' && tally();
@@ -771,11 +778,12 @@ var App = (function () {
       $('#sess', v).onclick = sessionSheet; if ($('#rsc', v)) $('#rsc', v).onclick = backupScreen; $('#bk', v).onclick = backupScreen;
       $('#qp', v).onclick = function () { if (QP.active) qpNext(); else quickPlay(); };
       if ($('#edgechip', v)) $('#edgechip', v).onclick = function () { EG.screen(edgeCheck); };
-      if (typeof EG !== 'undefined' && !$('#modal').innerHTML) EG.welcome(edgeCheck);
+      if ($('#spx', v)) $('#spx', v).onclick = spxSheet;
+      if (typeof EG !== 'undefined' && !$('#modal').innerHTML && !EG.welcome(edgeCheck)) EG.monthlyOffer();
       if ($('#path', v)) $('#path', v).onclick = RM.home;
       if (QP.active) $('#qpstop', v).onclick = function () { qpStop(); home(); };
       $('#fxt', v).onclick = function () { S.fx = S.fx === false; save(); if (S.fx) celebrate('level'); home(); };
-      $$('[data-game]', v).forEach(function (b) { b.onclick = function () { ({ vocab: WZ.vocab, think: TH.quiz, books: WZ.library, wisdom: WZ.wisdomScreen, math: function () { MM.drill(); }, thinkhome: TH.home, words: function () { GL.drill(); } })[b.dataset.game](); }; });
+      $$('[data-game]', v).forEach(function (b) { b.onclick = function () { ({ vocab: WZ.vocab, think: TH.quiz, books: WZ.library, wisdom: WZ.wisdomScreen, math: function () { MM.drill(); }, street: function () { ST.home(); }, thinkhome: TH.home, words: function () { GL.drill(); } })[b.dataset.game](); }; });
       if ($('#qod', v).id === 'qod') $('#qod', v).onclick = function () { var m = $('#qodm', v); m.hidden = !m.hidden; };
       $('#reset', v).onclick = function () {
         modal('<h2>Reset all progress?</h2><p class="mute">Levels, ratings and stats go back to the start. A safety copy is kept under Backups, so you can undo this.</p><div class="btns"><button class="btn" id="no">Keep</button><button class="btn primary" id="yes">Reset</button></div>');
@@ -793,8 +801,14 @@ var App = (function () {
       var pts = px.map(function (v, i) { return [(i / (n - 1) * 100).toFixed(2), (36 - (v - lo) / (hi - lo || 1) * 30).toFixed(2)]; });
       var line = 'M' + pts.map(function (p) { return p.join(','); }).join(' L');
       var chg = (px[n - 1] / px[0] - 1) * 100;
-      return '<div class="hband"><div class="hcap mono"><span>S&amp;P 500 · last 4 years</span><span class="' + (chg >= 0 ? 'up' : 'dn') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(0) + '%</span></div><svg class="hspark" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><path d="' + line + ' L100,40 L0,40 Z" fill="url(#hg)"/><path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg></div>';
+      return '<div class="hband" id="spx" role="button" style="cursor:pointer"><div class="hcap mono"><span>S&amp;P 500 · last 4 years ⓘ</span><span class="' + (chg >= 0 ? 'up' : 'dn') + '">' + (chg >= 0 ? '+' : '') + chg.toFixed(0) + '%</span></div><svg class="hspark" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="hg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs><path d="' + line + ' L100,40 L0,40 Z" fill="url(#hg)"/><path d="' + line + '" fill="none" stroke="var(--accent)" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg></div>';
     } catch (e) { return ''; }
+  }
+  // what the hero chart means, in plain words (tap the chart)
+  function spxSheet() {
+    var px = (MKT_DATA.monthly.px.SPY || []).filter(function (x) { return x != null; }).slice(-48), chg = Math.round((px[px.length - 1] / px[0] - 1) * 100), d = MKT_DATA.monthly.dates || [];
+    var sheet = modal('<div class="grab"></div><span class="eyebrow">The chart on Home</span><h2>S&amp;P 500, last 4 years</h2><p>The line is the price of the S&amp;P 500 (through SPY, the fund that tracks it), one point per month for the last 48 months. The ' + (chg >= 0 ? '+' : '') + chg + '% is how much it changed over those 4 years: $100 in it then would be about $' + (100 + chg) + ' now, before dividends.</p><p class="small mute">It’s there as your benchmark: the S&amp;P 500 is the market average that ToneBot and every trading idea you learn has to beat. The data refreshes every Sunday' + (d.length ? ' (latest month: ' + esc(String(d[d.length - 1])) + ')' : '') + '.</p><button class="btn primary" id="spok" style="width:100%">Got it</button>', true);
+    $('#spok', sheet).onclick = closeModal;
   }
   function dial(k, glyph, label, stat, pct, han) {
     var R = 25, C = 2 * Math.PI * R, off = C * (1 - Math.max(0.02, Math.min(1, pct)));
@@ -842,6 +856,7 @@ var App = (function () {
       (typeof GL !== 'undefined' ? g('words', 'Ab', 'Words to Know', GL.mastered() + ' of ' + GL.T.length + ' terms mastered', GL.dueCount() ? GL.dueCount() + ' to learn' : '') : '') +
       g('think', '?!', 'Outside the Box', th.n ? th.ok + ' of ' + th.n + ' right' : '6 creative questions', '') +
       (typeof MM !== 'undefined' ? g('math', '%', 'Quick Math', MM.summary(), '') : '') +
+      (typeof ST !== 'undefined' && ST.ALL.length ? g('street', '⚑&#xFE0E;', 'Street Smarts', ST.summary(), ST.due() ? ST.due() + ' to review' : '') : '') +
       g('wisdom', '❝&#xFE0E;', 'Metaphor Match', sg.sub, sg.badge) +
       g('books', '♫&#xFE0E;', 'Audiobooks', 'Listen while you train', '') +
       '</div>';
@@ -919,6 +934,6 @@ var App = (function () {
     backupScreen: backupScreen, idkBtn: idkBtn, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
-    st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, edgeCheck: edgeCheck, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
+    st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
   };
 })();
