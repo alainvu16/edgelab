@@ -36,6 +36,7 @@ var App = (function () {
     clearTimeout(saveT);
     S.savedAt = Date.now();
     saveT = setTimeout(writeLocal, 150);
+    if (GH.cfg) ghPush(false);
     if (cloudDoc && !cloudT) cloudT = setTimeout(function () { cloudT = null; cloudPush(); }, 8000);
   }
   // ---------- backups: never lose progress ----------
@@ -79,7 +80,7 @@ var App = (function () {
         (saveFail ? '<div class="coach wrong"><p>This phone’s storage is full, so saving here failed. Free some space or save a backup code now.</p></div>' : '') +
         '<div class="panel"><h3>Backup code</h3><p class="small mute">Copy this and paste it into Notes. Paste it back below to restore on any device, even the offline version.</p><div class="btns"><button class="btn primary" id="cp">Copy backup code</button><button class="btn" id="dl">Save as file</button></div><textarea id="code" rows="3" readonly style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px;font:12px var(--mono, monospace)"></textarea></div>' +
         '<div class="panel"><h3>Restore from a code</h3><textarea id="in" rows="3" placeholder="Paste a backup code" style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:8px;font:12px var(--mono, monospace)"></textarea><div class="btns"><button class="btn primary" id="rs">Restore this code</button><label class="btn" style="cursor:pointer">Load backup file<input type="file" id="fl" accept=".txt,text/plain" hidden></label></div><p class="small" id="rsm"></p></div>' +
-        '<h3>Saved copies</h3><div class="list" id="bl">' + (list.length ? list.map(function (b, i) { return '<button class="item" data-b="' + i + '"><span class="grow"><span class="t">' + esc(fmtAt(b.at)) + '</span><br><span class="s">' + esc(b.why === 'daily' ? 'Daily copy' : 'Safety copy, ' + b.why) + ' · ' + (+b.score || 0) + ' things done</span></span><span class="end">Restore</span></button>'; }).join('') : '<p class="mute small">Copies appear after your first answers.</p>') + '</div>' +
+        (window.claude ? '' : ghPanel()) + '<h3>Saved copies</h3><div class="list" id="bl">' + (list.length ? list.map(function (b, i) { return '<button class="item" data-b="' + i + '"><span class="grow"><span class="t">' + esc(fmtAt(b.at)) + '</span><br><span class="s">' + esc(b.why === 'daily' ? 'Daily copy' : 'Safety copy, ' + b.why) + ' · ' + (+b.score || 0) + ' things done</span></span><span class="end">Restore</span></button>'; }).join('') : '<p class="mute small">Copies appear after your first answers.</p>') + '</div>' +
         (cloudDoc ? '<button class="btn sm ghost" id="cl">Show account copies</button><div class="list" id="cll"></div>' : '');
       var code = makeCode(S);
       $('#code', v).value = code;
@@ -119,6 +120,7 @@ var App = (function () {
         var f = this.files && this.files[0]; if (!f) return;
         var rd = new FileReader(); rd.onload = function () { tryRestore(String(rd.result || '')); }; rd.onerror = function () { $('#rsm', v).textContent = 'Couldn’t open that file. Try pasting the code instead.'; }; rd.readAsText(f);
       };
+      ghWire(v, function () { App.back(); backupScreen(); });
       $$('[data-b]', v).forEach(function (b) { b.onclick = function () { var x = list[+b.dataset.b]; if (x && validState(x.state)) confirmRestore(x.state, x.score); }; });
       if (cloudDoc) $('#cl', v).onclick = function () {
         var out = $('#cll', v); out.innerHTML = '<p class="small mute">Loading…</p>';
@@ -130,6 +132,94 @@ var App = (function () {
       };
     });
   }
+  // ---------- auto-backup to Alain's private GitHub repo ----------
+  // The token lives only on this phone (localStorage 'edgelab.gh'), is never part of the progress or backup codes,
+  // and is only ever sent to api.github.com. The file also carries screen size and recent errors so Claude can check the app without screenshots.
+  var GH = { cfg: null, sha: null, last: 0, status: '', timer: null, busy: false, ahead: null };
+  try { GH.cfg = JSON.parse(localStorage.getItem('edgelab.gh') || 'null'); } catch (e) {}
+  function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
+  function unb64(str) { return decodeURIComponent(escape(atob(String(str).replace(/\s/g, '')))); }
+  function ghReq(method, body, keepalive) {
+    var c = GH.cfg; if (!c || !c.token || !c.repo) return Promise.reject(new Error('not set'));
+    return fetch('https://api.github.com/repos/' + c.repo + '/contents/progress.json', {
+      method: method, keepalive: !!keepalive, cache: 'no-store',
+      headers: { 'Authorization': 'Bearer ' + c.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  }
+  function deviceInfo() {
+    var vv = window.visualViewport;
+    return { screen: screen.width + 'x' + screen.height, view: innerWidth + 'x' + innerHeight, vv: vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) : '', app: !!navigator.standalone,
+      ua: navigator.userAgent, version: (document.querySelector('script[src*="core.js"]') || {}).src || '', errors: (window.__errs || []).slice(-15) };
+  }
+  function ghFetchRemote() {
+    return ghReq('GET').then(function (res) {
+      if (res.status === 404) { GH.sha = null; return null; }
+      if (!res.ok) throw new Error('GitHub said ' + res.status);
+      return res.json().then(function (j) { GH.sha = j.sha; var d = JSON.parse(unb64(j.content)); return d; });
+    });
+  }
+  function ghPush(now) {
+    if (!GH.cfg || GH.busy || !navigator.onLine) return;
+    if (GH.ahead) return; // the GitHub copy has more progress: never overwrite it until Alain chooses
+    clearTimeout(GH.timer);
+    if (!now) { GH.timer = setTimeout(function () { ghPush(true); }, Math.max(15000, 180000 - (Date.now() - GH.last))); return; }
+    GH.busy = true;
+    var payload = { savedAt: Date.now(), score: progressScore(S), state: S, device: deviceInfo() };
+    var send = function () {
+      return ghReq('PUT', { message: 'Edge Lab backup · ' + payload.score + ' things done', content: b64(JSON.stringify(payload, null, 1)), sha: GH.sha || undefined }, true)
+        .then(function (res) { if (res.status === 409 || res.status === 422) { GH.sha = null; throw new Error('retry'); } if (!res.ok) throw new Error('GitHub said ' + res.status); return res.json(); })
+        .then(function (j) { GH.sha = j.content && j.content.sha; GH.last = Date.now(); GH.status = 'ok'; });
+    };
+    (GH.sha ? send() : ghFetchRemote().then(send))
+      .catch(function (e) { if (e && e.message === 'retry') return ghFetchRemote().then(send); throw e; })
+      .catch(function (e) { GH.status = 'err:' + (e && e.message || e); })
+      .then(function () { GH.busy = false; });
+  }
+  // On open: if the GitHub copy has more progress than this phone (new install, other device), offer it.
+  function ghCheckOnOpen() {
+    if (!GH.cfg || !navigator.onLine) return;
+    ghFetchRemote().then(function (d) {
+      if (d && validState(d.state) && progressScore(d.state) > progressScore(S)) {
+        GH.ahead = d;
+        modal('<h2>Your GitHub backup has more progress</h2><p class="mute">Backup from ' + esc(fmtAt(d.savedAt)) + ': ' + progressScore(d.state) + ' things done. This phone: ' + progressScore(S) + '.</p><div class="btns"><button class="btn" id="no">Keep this phone’s</button><button class="btn primary" id="yes">Restore it</button></div>');
+        $('#no').onclick = function () { GH.ahead = null; closeModal(); ghPush(true); };
+        $('#yes').onclick = function () { replaceState(d.state, 'before restoring from GitHub'); GH.ahead = null; closeModal(); toast('Restored from GitHub.'); tab('home'); };
+      } else ghPush(true);
+    }, function (e) { GH.status = 'err:' + (e && e.message || e); });
+  }
+  function ghPanel() {
+    var c = GH.cfg;
+    var st = !c ? '' : GH.status === 'ok' ? 'Backed up ' + esc(fmtAt(GH.last)) : GH.status.indexOf('err:') === 0 ? 'Last try failed (' + esc(GH.status.slice(4)) + '). It retries automatically.' : navigator.onLine ? 'Connected. First backup in a moment.' : 'Offline: it backs up next time you’re online.';
+    return '<div class="panel"><h3>Auto-backup to your GitHub</h3>' + (c
+      ? '<p class="small">On · <span class="mono">' + esc(c.repo) + '</span></p><p class="small mute" id="ghst">' + st + '</p><div class="btns"><button class="btn primary" id="ghnow">Back up now</button><button class="btn" id="ghrs">Restore from GitHub</button><button class="btn ghost" id="ghoff">Turn off</button></div>'
+      : '<p class="small mute">Saves your progress to your own private GitHub repo every few minutes while you play, so a lost phone or deleted icon costs nothing. Paste the access token you made on GitHub (it stays on this phone).</p><input id="ghrepo" value="alainvu16/edgelab-data" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px;font:13px var(--mono, monospace)"><input id="ghtok" type="password" placeholder="github_pat_…" autocapitalize="off" autocorrect="off" spellcheck="false" style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px;font:13px var(--mono, monospace)"><button class="btn primary" id="ghon">Connect</button>') + '<p class="small" id="ghm"></p></div>';
+  }
+  function ghWire(v, redraw) {
+    if ($('#ghon', v).id === 'ghon') $('#ghon', v).onclick = function () {
+      var repo = ($('#ghrepo', v).value || '').trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/+$/, ''), tok = ($('#ghtok', v).value || '').trim();
+      if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || tok.length < 20) { $('#ghm', v).textContent = 'Check the repo name (owner/name) and paste the whole token.'; return; }
+      $('#ghm', v).textContent = 'Checking…';
+      var prev = GH.cfg; GH.cfg = { repo: repo, token: tok };
+      fetch('https://api.github.com/repos/' + repo, { headers: { 'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json' }, cache: 'no-store' }).then(function (res) {
+        if (res.status === 401) throw new Error('GitHub didn’t accept that token. Make a new one and paste it again.');
+        if (res.status === 404) throw new Error('Can’t see ' + repo + '. Check the name, and that the token includes that repo.');
+        if (!res.ok) throw new Error('GitHub said ' + res.status + '.');
+        return res.json();
+      }).then(function (j) {
+        if (j.permissions && j.permissions.push === false) throw new Error('The token can read but not write. Set Contents to “Read and write”.');
+        try { localStorage.setItem('edgelab.gh', JSON.stringify(GH.cfg)); } catch (e) {}
+        GH.sha = null; GH.status = ''; redraw(); ghCheckOnOpen();
+      }).catch(function (e) { GH.cfg = prev; $('#ghm', v).textContent = (e && e.message) || 'Couldn’t reach GitHub. Check your connection.'; });
+    };
+    if ($('#ghnow', v).id === 'ghnow') $('#ghnow', v).onclick = function () { GH.ahead = null; GH.last = 0; $('#ghst', v).textContent = 'Backing up…'; ghPush(true); setTimeout(redraw, 2500); };
+    if ($('#ghrs', v).id === 'ghrs') $('#ghrs', v).onclick = function () {
+      $('#ghm', v).textContent = 'Loading…';
+      ghFetchRemote().then(function (d) { if (!d || !validState(d.state)) { $('#ghm', v).textContent = 'No backup on GitHub yet.'; return; } $('#ghm', v).textContent = ''; confirmRestore(d.state, d.score); }, function (e) { $('#ghm', v).textContent = 'Couldn’t reach GitHub (' + ((e && e.message) || 'offline') + ').'; });
+    };
+    if ($('#ghoff', v).id === 'ghoff') $('#ghoff', v).onclick = function () { GH.cfg = null; try { localStorage.removeItem('edgelab.gh'); } catch (e) {} redraw(); };
+  }
+  window.addEventListener('online', function () { if (GH.cfg) ghPush(true); });
   // Backup code: EDGE1:<base64 of your progress>.END  (the .END lets us spot a code that got cut off when copying)
   function makeCode(s) { return 'EDGE1:' + btoa(unescape(encodeURIComponent(JSON.stringify(s)))) + '.END'; }
   function readCode(text) {
@@ -192,8 +282,8 @@ var App = (function () {
       });
     }).catch(function () { cloudStatus = 'err'; });
   }
-  window.addEventListener('pagehide', function () { clearTimeout(saveT); writeLocal(); });
-  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { clearTimeout(saveT); writeLocal(); if (cloudDoc) { clearTimeout(cloudT); cloudT = null; cloudPush(); } } });
+  window.addEventListener('pagehide', function () { clearTimeout(saveT); writeLocal(); if (GH.cfg && Date.now() - GH.last > 20000) ghPush(true); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { clearTimeout(saveT); writeLocal(); if (GH.cfg && Date.now() - GH.last > 20000) ghPush(true); if (cloudDoc) { clearTimeout(cloudT); cloudT = null; cloudPush(); } } });
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   // Missing elements return a detached stand-in, so a callback that finishes after you leave a screen can't crash the app.
   function $(sel, el) { return (el || document).querySelector(sel) || document.createElement('div'); }
@@ -695,6 +785,7 @@ var App = (function () {
     $$('#tabs button').forEach(function (b) { b.onclick = function () { tab(b.dataset.tab); }; });
     setInterval(tick, 1000);
     setInterval(function () { if (cloudDoc) cloudPush(); }, 60000);
+    setTimeout(ghCheckOnOpen, 2500);
     document.addEventListener('visibilitychange', function () { lastTick = Date.now(); });
     var h = (location.hash || '').slice(1);
     tab(mods[h] ? h : 'home');
