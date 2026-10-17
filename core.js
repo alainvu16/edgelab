@@ -747,13 +747,13 @@ var App = (function () {
   function gamesHTML() {
     var due = 0, tier = 1, mast = 0, th = (S.think || { n: 0, ok: 0 });
     try { due = WZ.dueCount(); var vs = WZ.vst(); tier = vs.tier || 1; mast = WZ.WORDS.filter(function (w) { return (vs.box[w[0]] || 0) >= 4; }).length; } catch (e) {}
-    function g(key, glyph, name, sub, badge) { return '<button class="game" data-game="' + key + '"><span class="gi">' + glyph + '</span><span class="gn">' + name + '</span><span class="gs">' + sub + '</span>' + (badge ? '<span class="gb">' + badge + '</span>' : '') + '</button>'; }
+    function g(key, glyph, name, sub, badge) { return '<button class="game" data-game="' + key + '" aria-label="' + name + ', ' + sub + '"><span class="gi" aria-hidden="true">' + glyph + '</span><span class="gt"><span class="gn">' + name + '</span><span class="gs">' + sub + '</span></span><span class="ge">' + (badge ? '<span class="gb">' + badge + '</span>' : '') + '<span class="gc" aria-hidden="true">›</span></span></button>'; }
     return '<div class="games-h"><h3>Daily games</h3><span class="small mute">Quick rounds that sharpen everything else</span></div><div class="games">' +
       g('vocab', 'Aa', 'Word Duel', 'Tier ' + tier + ' · ' + mast + ' mastered', due ? due + ' due' : '') +
-      g('think', '?!', 'Outside the Box', th.n ? th.ok + ' of ' + th.n + ' right' : '6 creative questions', '') +
-      g('wisdom', '❝', 'Metaphor Match', 'Lines of life and game', '') +
-      g('books', '♫', 'Audiobooks', 'Listen while you train', '') +
       (typeof GL !== 'undefined' ? g('words', 'Ab', 'Words to Know', GL.mastered() + ' of ' + GL.T.length + ' terms mastered', GL.dueCount() ? GL.dueCount() + ' to learn' : '') : '') +
+      g('think', '?!', 'Outside the Box', th.n ? th.ok + ' of ' + th.n + ' right' : '6 creative questions', '') +
+      g('wisdom', '❝&#xFE0E;', 'Metaphor Match', 'Lines of life and game', '') +
+      g('books', '♫&#xFE0E;', 'Audiobooks', 'Listen while you train', '') +
       '</div>';
   }
   function frontHTML(greet) {

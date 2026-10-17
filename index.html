@@ -120,15 +120,21 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .qod .qm{color:var(--fg);opacity:.85}
 .qod .qh{color:var(--mute);font-size:11px}
 .qod:has(.qm:not([hidden])) .qh{display:none}
-.games-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:2px}
-.games{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.game{position:relative;appearance:none;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:3px;padding:14px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,var(--panel2),var(--panel));color:var(--fg);min-width:0}
-.game[data-game="words"]{grid-column:1/-1;order:-1}
-.game .gi{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font:800 18px var(--display);margin-bottom:6px}
-.game .gn{font:700 15px var(--display)}
+.games-h{display:flex;flex-direction:column;gap:2px;margin-top:2px}
+.games-h h3{margin:0}
+.games{display:flex;flex-direction:column;border-radius:16px;border:1px solid var(--line);background:var(--panel);overflow:hidden}
+.game{appearance:none;cursor:pointer;text-align:left;display:grid;grid-template-columns:40px 1fr auto;align-items:center;column-gap:12px;padding:12px 14px;min-height:64px;border:0;border-top:1px solid var(--line);background:none;color:var(--fg);min-width:0;width:100%}
+.game:first-child{border-top:0}
+.game .gi{grid-row:1/3;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font:800 17px/1 var(--display)}
+.game[data-game="wisdom"] .gi,.game[data-game="books"] .gi{font:400 26px/1 var(--body)}
+.game[data-game="wisdom"] .gi{padding-top:8px}
+.game .gt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.game .gn{font:700 15px var(--display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .game .gs{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.game .gb{position:absolute;top:12px;right:12px;font:700 11px var(--mono);background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:3px 8px}
-.game:active{transform:scale(.98)}
+.game .ge{display:flex;align-items:center;gap:8px}
+.game .gb{font:700 11px var(--mono);background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:3px 8px;white-space:nowrap}
+.game .gc{color:var(--mute);font-size:18px;line-height:1}
+.game:active{background:color-mix(in srgb,var(--fg) 5%,transparent)}
 /* glossary: tap-to-learn jargon */
 .gl{text-decoration:underline dotted color-mix(in srgb,var(--accent) 80%,transparent);text-decoration-thickness:2px;text-underline-offset:3px;cursor:help}
 #glpop{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:70;max-width:560px;margin:0 auto;background:var(--panel);border:1px solid var(--accent);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 12px 40px -12px rgba(0,0,0,.6)}
@@ -256,27 +262,27 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 </div>
 <div id="modal"></div>
 
-<script src="chess.js?v=44"></script>
-<script src="core.js?v=44"></script>
-<script src="glossary.js?v=44"></script>
-<script src="content.js?v=44"></script>
-<script src="distract.js?v=44"></script>
-<script src="engine.js?v=44"></script>
-<script src="puzzles.js?v=44"></script>
-<script src="chess-app.js?v=44"></script>
-<script src="xq-engine.js?v=44"></script>
-<script src="xq.js?v=44"></script>
-<script src="poker.js?v=44"></script>
-<script src="mktdata.js?v=44"></script>
-<script src="tapedata.js?v=44"></script>
-<script src="momentum.js?v=44"></script>
-<script src="wisdom.js?v=44"></script>
-<script src="think.js?v=44"></script>
-<script src="macro.js?v=44"></script>
-<script src="tape.js?v=44"></script>
-<script src="tonebot.js?v=44"></script>
-<script src="markets.js?v=44"></script>
-<script src="roadmap.js?v=44"></script>
+<script src="chess.js?v=45"></script>
+<script src="core.js?v=45"></script>
+<script src="glossary.js?v=45"></script>
+<script src="content.js?v=45"></script>
+<script src="distract.js?v=45"></script>
+<script src="engine.js?v=45"></script>
+<script src="puzzles.js?v=45"></script>
+<script src="chess-app.js?v=45"></script>
+<script src="xq-engine.js?v=45"></script>
+<script src="xq.js?v=45"></script>
+<script src="poker.js?v=45"></script>
+<script src="mktdata.js?v=45"></script>
+<script src="tapedata.js?v=45"></script>
+<script src="momentum.js?v=45"></script>
+<script src="wisdom.js?v=45"></script>
+<script src="think.js?v=45"></script>
+<script src="macro.js?v=45"></script>
+<script src="tape.js?v=45"></script>
+<script src="tonebot.js?v=45"></script>
+<script src="markets.js?v=45"></script>
+<script src="roadmap.js?v=45"></script>
 <script>
 window.addEventListener('error', function (e) {
   try { (window.__errs = window.__errs || []).push(new Date().toISOString().slice(0, 16) + ' ' + (e.message || e) + (e.filename ? ' @' + e.filename.split('/').pop().split('?')[0] + ':' + e.lineno : '')); if (window.__errs.length > 30) window.__errs.shift(); } catch (x) {}
