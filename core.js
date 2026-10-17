@@ -294,7 +294,7 @@ var App = (function () {
       '<h3>Market breaks</h3><p class="mute small">A short trading quiz after every stretch of play.</p>' +
       '<div class="seg" id="bev">' + [8, 12, 20, 0].map(function (m) { return '<button aria-pressed="' + (S.breakEvery === m) + '" data-b="' + m + '">' + (m ? 'Every ' + m + ' min' : 'Off') + '</button>'; }).join('') + '</div>' +
       (sampleFn ? '<h3>Explain like I’m 5</h3><div class="seg" id="simps">' + [['off', 'Button only'], ['wrong', 'When I’m wrong'], ['always', 'Always']].map(function (o) { return '<button aria-pressed="' + ((S.simple || 'wrong') === o[0]) + '" data-sm="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><p class="mute small">Rewrites coach notes in kid-simple words using Claude (needs a connection).</p>' : '') +
-      '<h3>Celebrations</h3><div class="seg" id="fxs"><button aria-pressed="' + (S.fx !== false) + '" data-fx="1">On</button><button aria-pressed="' + (S.fx === false) + '" data-fx="0">Off</button></div><p class="mute small">Gold rain after wins and level-ups. Tap On to preview.</p>' +
+      '<h3>Celebrations</h3><div class="seg" id="fxs"><button aria-pressed="' + (S.fx !== false) + '" data-fx="1">On</button><button aria-pressed="' + (S.fx === false) + '" data-fx="0">Off</button></div><p class="mute small">Money rain after wins and level-ups: tumbling bills, spinning gold coins and currency signs. Tap On to preview.</p>' +
       (ss.active ? '<button class="btn ghost" id="endS">End session now</button>' : '') +
       '<button class="btn ghost" id="cls">Close</button>');
     $$('#modal [data-m]').forEach(function (b) { b.onclick = function () { startSession(+b.dataset.m); closeModal(); }; });
@@ -387,29 +387,71 @@ var App = (function () {
 
   // ---------- celebration: "edge rain" — gold knights, spades, 炮 and green candles ----------
   var rainT = null;
+  // ---------- celebration: money rain (tumbling bills, spinning gold coins, currency signs) ----------
+  var sprites = null;
+  function makeSprites() {
+    var dpr = Math.min(2, window.devicePixelRatio || 1);
+    function cnv(w, h, draw) { var c = document.createElement('canvas'); c.width = w * dpr; c.height = h * dpr; var x = c.getContext('2d'); x.scale(dpr, dpr); draw(x, w, h); return { c: c, w: w, h: h }; }
+    function bill(face) {
+      return cnv(64, 30, function (x, w, h) {
+        var g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#7fc39a'); g.addColorStop(.5, '#a8dcb7'); g.addColorStop(1, '#6fb48b');
+        x.fillStyle = g; x.beginPath(); x.roundRect ? x.roundRect(0, 0, w, h, 3) : x.rect(0, 0, w, h); x.fill();
+        x.strokeStyle = '#2f6b47'; x.lineWidth = 1.4; x.strokeRect(2.5, 2.5, w - 5, h - 5);
+        x.fillStyle = '#d9f0df'; x.beginPath(); x.ellipse(w / 2, h / 2, 9, 10, 0, 0, 6.29); x.fill();
+        x.strokeStyle = '#2f6b47'; x.lineWidth = 1; x.stroke();
+        x.fillStyle = '#245a3a'; x.font = '800 13px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('$', w / 2, h / 2 + 1);
+        x.font = '800 7px system-ui,sans-serif'; x.fillText(face, 9, 8); x.fillText(face, w - 9, h - 7);
+      });
+    }
+    function coin(sym) {
+      return cnv(30, 30, function (x, w, h) {
+        var g = x.createRadialGradient(10, 9, 2, 15, 15, 15); g.addColorStop(0, '#fff2bf'); g.addColorStop(.45, '#f0b545'); g.addColorStop(1, '#a8741b');
+        x.fillStyle = g; x.beginPath(); x.arc(15, 15, 14, 0, 6.29); x.fill();
+        x.strokeStyle = '#8a5d12'; x.lineWidth = 1.2; x.beginPath(); x.arc(15, 15, 11, 0, 6.29); x.stroke();
+        x.fillStyle = '#7a520f'; x.font = '800 14px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(sym, 15, 16);
+      });
+    }
+    function sign(sym, col) { return cnv(34, 34, function (x) { x.fillStyle = col; x.font = '800 26px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 4; x.fillText(sym, 17, 18); }); }
+    return {
+      bills: [bill('100'), bill('50'), bill('20')],
+      coins: [coin('$'), coin('€'), coin('¥'), coin('₿')],
+      signs: [sign('$', '#f0b545'), sign('€', '#fbe29a'), sign('£', '#f0b545'), sign('¥', '#fbe29a'), sign('₿', '#f7a531'), sign('$', '#4cc08a')]
+    };
+  }
   function celebrate(kind) {
     if (S.fx === false) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    try { if (!sprites) sprites = makeSprites(); } catch (e) { return; }
     var old = $('#fx'); if (old) old.remove();
     var cv = document.createElement('canvas'); cv.id = 'fx'; cv.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;z-index:60;pointer-events:none';
     document.body.appendChild(cv);
-    var dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    var W = innerWidth, H = innerHeight, dpr = Math.min(2, window.devicePixelRatio || 1); cv.width = W * dpr; cv.height = H * dpr;
     var ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
-    var glyphs = { chess: ['\u265E', '\u265B', '\u2654'], xq: ['\u70AE', '\u5E25', '\u8ECA'], poker: ['\u2660', '\u2665', '\u2666', '\u2663'], mkt: ['\u2191', '$', '\u25B2'], level: ['\u2605', '\u265E', '\u2660', '\u70AE', '\u2191'] };
-    var set = glyphs[kind] || glyphs.level, N = kind === 'level' ? 90 : 60, P = [];
-    for (var i = 0; i < N; i++) P.push({ x: Math.random() * innerWidth, y: -40 - Math.random() * innerHeight * 0.8, v: 2.2 + Math.random() * 3, r: Math.random() * 6.28, w: (Math.random() - .5) * .15, s: 16 + Math.random() * 18, g: set[i % set.length], c: i % 5 === 0 ? '#4cc08a' : i % 3 === 0 ? '#fbe29a' : '#f0b545', candle: kind === 'mkt' && i % 4 === 0 });
+    var big = kind === 'level', N = big ? 80 : 55, P = [];
+    for (var i = 0; i < N; i++) {
+      var r = Math.random(), type = r < .45 ? 'bill' : r < .75 ? 'coin' : 'sign';
+      var pool = type === 'bill' ? sprites.bills : type === 'coin' ? sprites.coins : sprites.signs;
+      P.push({ t: type, sp: pool[(Math.random() * pool.length) | 0], x: Math.random() * W, y: -40 - Math.random() * H * (big ? 1 : .8),
+        v: type === 'bill' ? 1.4 + Math.random() * 1.6 : 2.4 + Math.random() * 2.4, // bills float, coins drop
+        rot: Math.random() * 6.28, vr: (Math.random() - .5) * (type === 'bill' ? .05 : .12), ph: Math.random() * 6.28, vp: .06 + Math.random() * .08,
+        sway: 18 + Math.random() * 26, sc: .8 + Math.random() * .5 });
+    }
     var t0 = performance.now();
     function frame(t) {
-      var el = (t - t0) / 1000; ctx.clearRect(0, 0, innerWidth, innerHeight);
-      ctx.globalAlpha = el > 2.6 ? Math.max(0, 1 - (el - 2.6) / 0.6) : 1;
-      P.forEach(function (p) {
-        p.y += p.v; p.r += p.w; p.x += Math.sin(el * 2 + p.r) * .4;
-        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r);
-        if (p.candle) { ctx.fillStyle = '#4cc08a'; ctx.fillRect(-1, -14, 2, 28); ctx.fillRect(-5, -6, 10, 14); }
-        else { ctx.font = '700 ' + p.s + 'px ' + (kind === 'xq' ? '"Noto Serif SC","PingFang SC",serif' : 'system-ui,sans-serif'); ctx.fillStyle = p.c; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(p.g, 0, 0); }
+      var el = (t - t0) / 1000; ctx.clearRect(0, 0, W, H);
+      ctx.globalAlpha = el > 2.8 ? Math.max(0, 1 - (el - 2.8) / 0.6) : 1;
+      for (var i = 0; i < P.length; i++) {
+        var p = P[i], sp = p.sp; p.y += p.v; p.rot += p.vr; p.ph += p.vp;
+        var x = p.x + Math.sin(p.ph * .7) * (p.t === 'bill' ? p.sway : 6);
+        ctx.save(); ctx.translate(x, p.y); ctx.rotate(p.rot);
+        // bills tumble end over end, coins spin edge-on: fake 3D with a squash
+        if (p.t === 'bill') ctx.scale(p.sc, p.sc * (0.25 + 0.75 * Math.abs(Math.cos(p.ph))));
+        else if (p.t === 'coin') ctx.scale(p.sc * (0.15 + 0.85 * Math.abs(Math.cos(p.ph * 1.3))), p.sc);
+        else ctx.scale(p.sc, p.sc);
+        ctx.drawImage(sp.c, -sp.w / 2, -sp.h / 2, sp.w, sp.h);
         ctx.restore();
-      });
-      if (el < 3.2) rainT = requestAnimationFrame(frame); else cv.remove();
+      }
+      if (el < 3.4) rainT = requestAnimationFrame(frame); else cv.remove();
     }
     cancelAnimationFrame(rainT); rainT = requestAnimationFrame(frame);
   }
@@ -576,7 +618,7 @@ var App = (function () {
     return '<section class="hero">' +
       '<div class="hrow"><span class="eyebrow">' + greet + ', Alain</span>' + streak + '</div>' +
       '<h1 class="htitle">Train your <span>edge</span>.</h1>' +
-      '<p class="hsub mono">' + (today >= goal ? Math.min(today, 999) + ' questions today · goal hit · ' : today + '/' + goal + ' questions today · ') + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
+      '<p class="hsub mono">' + (today >= goal ? Math.min(today, 999) + ' questions · goal hit · ' : today + '/' + goal + ' questions today · ') + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
       '<div class="dials">' +
         dial('mkt', '↗', 'Markets', 'Lv ' + (m.level || 1), path.mkt || 0) +
         dial('chess', '&#9822;&#xFE0E;', 'Chess', elo, path.chess || 0) +
