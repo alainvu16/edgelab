@@ -473,7 +473,21 @@ var App = (function () {
   var QP = { active: false, count: 0, quota: 1, start: 0, last: null, lastLabel: '', blocks: {}, n: 0 };
   var QNAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', vocab: 'Vocabulary', words: 'Words to Know', think: 'Think outside the box', sage: 'Metaphor Match', math: 'Quick Math' };
   function qname(k) { return QNAME[k] || 'Training'; }
+  // Edge check: the first blocks go to the most-faded subjects (EG.rank), harder where it can be
+  var QP_KEY = { words: 'words', quotes: 'sage', math: 'math' };
+  function edgePick() {
+    var ks = EG.rank().filter(function (k) { return (QP_KEY[k] || k) !== QP.last; }), k = ks[0]; if (!k) return null;
+    var nm = EG.NAME[k], a;
+    if (mods[k] && mods[k].quick) { var list = mods[k].quick(); a = list[Math.floor(Math.random() * list.length)]; a = { k: k, label: a.label, go: a.go, quota: a.quota || 1 }; }
+    else if (k === 'words') a = (typeof WZ !== 'undefined' && WZ.dueCount() > 0) || typeof GL === 'undefined' ? { k: 'vocab', label: 'Word Duel review', go: function () { WZ.vocab(); } } : { k: 'words', label: 'Words to Know', go: function () { GL.drill(); } };
+    else if (k === 'math') a = { k: 'math', label: 'Quick Math, every question on the clock', go: function () { MM.drill({ allTimed: true }); } };
+    else if (k === 'quotes') a = { k: 'sage', label: 'Quotes: question me', go: WZ.sageQuiz };
+    if (!a) return null;
+    a.edge = true; a.why = nm + ' faded the most since you last trained it. Re-testing it first brings your edge back fastest.'; a.label = 'Edge check · ' + a.label;
+    return a;
+  }
   function qpPick() {
+    if (QP.edge > 0 && typeof EG !== 'undefined') { var ea = edgePick(); if (ea) return ea; }
     var prog = { chess: ((S.chess.rating || 800) - 600) / 1400, xq: ((S.xq.level || 1) - 1) / 7, poker: ((S.poker.level || 1) - 1) / 11, mkt: ((S.mkt.level || 1) - 1) / 7 };
     var due = (typeof WZ !== 'undefined') ? WZ.dueCount() : 0;
     if (QP.n > 0 && QP.n % 4 === 3 && due >= 2 && QP.last !== 'vocab') return { k: 'vocab', label: 'Vocabulary review', why: due + ' words are due before they fade.', go: function () { WZ.vocab(); }, quota: 1 };
@@ -500,20 +514,28 @@ var App = (function () {
   function qpLaunch(a) {
     if (['poker', 'mkt', 'chess', 'xq'].indexOf(a.k) >= 0) QP.lastK = a.k; QP.last = a.k; QP.lastLabel = a.label; QP.count = 0; QP.quota = a.quota || 1; QP.start = Date.now(); QP.n++;
     QP.blocks[a.k] = (QP.blocks[a.k] || 0) + 1; QP.cur = a;
+    if (a.edge) QP.edge = Math.max(0, (QP.edge || 0) - 1);
     closeModal();
     if (!mods[a.k]) { tab('home'); } else { curTab = a.k; stack = []; $$('#tabs button').forEach(function (b) { b.setAttribute('aria-current', b.dataset.tab === a.k ? 'true' : 'false'); }); mods[a.k].home(); }
     a.go();
     toast('Quick play · ' + a.label);
   }
-  function quickPlay() {
+  function quickPlay(edge) {
     S.qpOn = 1; save();
-    QP.active = true; QP.limitNoted = false; QP.blocks = {}; QP.n = 0; QP.last = null; QP.lastLabel = '';
+    QP.active = true; QP.limitNoted = false; QP.blocks = {}; QP.n = 0; QP.last = null; QP.lastLabel = ''; QP.edge = edge ? 4 : 0;
     qpLaunch(qpPick());
   }
   function qpNext() { qpLaunch(qpPick()); }
+  function edgeCheck() { closeModal(); if (QP.active) { QP.edge = 4; qpNext(); } else quickPlay(true); }
   function qpStop() { QP.active = false; FADE.run = 0; S.qpOn = 0; save(); closeModal(); toast('Quick play stopped'); header(stack.length ? stack[stack.length - 1].title : 'Home', stack.length > 1); }
   var QP_WAIT = 4000; // ms before the next block starts by itself
   function qpBlockDone(done, left) {
+    if (typeof EG !== 'undefined' && EG.fullDay(answersToday())) {
+      var fs = modal('<div class="grab"></div><span class="eyebrow">Quick play</span><h2>That’s a full day</h2><p>' + answersToday() + ' answers today. Stopping here helps it stick, and makes tomorrow easy to start. Short, steady days keep your edge better than one huge one.</p><div class="btns"><button class="btn" id="fdk">Keep going</button><button class="btn primary" id="fds">Stop for today</button></div>', false);
+      $('#fds', fs).onclick = function () { qpStop(); tab('home'); };
+      $('#fdk', fs).onclick = function () { qpBlockDone(done, left); };
+      return;
+    }
     var a = qpPick();
     var sheet = modal('<div class="grab"></div><span class="eyebrow">Quick play · block ' + QP.n + ' done</span><h2>Next up: ' + qname(a.k) + '</h2><p><b>' + esc(a.label) + '</b></p>' + (a.why ? '<p class="mute small">' + a.why + '</p>' : '') +
       '<div class="bar" aria-hidden="true"><i id="qbar" style="width:0%;transition:width ' + QP_WAIT + 'ms linear"></i></div><p class="small mute" id="qcd">Starting by itself in a few seconds.</p>' +
@@ -669,9 +691,14 @@ var App = (function () {
     var box = b.closest('.qpfade');
     if (b.dataset.qpt === 'stop') { qpStop(); tab('home'); } else if (box) box.remove();
   }, true);
+  // which subject a graded answer belongs to: the tab for the four games, the screen for the daily games
+  var SUBJ_BY_TITLE = { 'Vocabulary': 'words', 'Words to know': 'words', 'Words to Know': 'words', 'Question me': 'quotes', 'Quick Math': 'math' };
+  function subjNow() { if (['chess', 'xq', 'poker', 'mkt'].indexOf(curTab) >= 0) return curTab; var top = stack[stack.length - 1]; return top ? SUBJ_BY_TITLE[top.title] || '' : ''; }
   function answersToday() { return S && S.daily && S.daily.d === dayKey(new Date()) ? S.daily.n : 0; }
   function coachHTML(grade, text, extra) {
-    var fade = (grade && grade !== 'info' && tally()) ? fadeNote(grade) : '';
+    var counted = grade && grade !== 'info' && tally();
+    if (counted && typeof EG !== 'undefined') EG.note(subjNow(), { right: 1, best: 1, great: 1, good: 1, inacc: 0.5 }[grade] || 0);
+    var fade = counted ? fadeNote(grade) : '';
     var g = GRADES[grade] || GRADES.info;
     if (grade === 'wrong' && Date.now() - idkAt < 1500) g = ['ok', 'Here’s how it works'];
     return '<div class="coach ' + g[0] + '" data-g="' + grade + '"><div class="h"><span class="pill ' + g[0] + '">' + g[1] + '</span>' + (extra || '') + '</div><p>' + text + '</p>' + (grade !== 'info' ? '<button class="btn sm ghost simp" type="button">Explain it simpler</button><div class="simpout small" hidden></div>' : '') + fade + '</div>';
@@ -743,6 +770,8 @@ var App = (function () {
       $$('[data-wk]', v).forEach(function (b) { b.onclick = function () { focusCache[+b.dataset.wk].r.go(); }; });
       $('#sess', v).onclick = sessionSheet; if ($('#rsc', v)) $('#rsc', v).onclick = backupScreen; $('#bk', v).onclick = backupScreen;
       $('#qp', v).onclick = function () { if (QP.active) qpNext(); else quickPlay(); };
+      if ($('#edgechip', v)) $('#edgechip', v).onclick = function () { EG.screen(edgeCheck); };
+      if (typeof EG !== 'undefined' && !$('#modal').innerHTML) EG.welcome(edgeCheck);
       if ($('#path', v)) $('#path', v).onclick = RM.home;
       if (QP.active) $('#qpstop', v).onclick = function () { qpStop(); home(); };
       $('#fxt', v).onclick = function () { S.fx = S.fx === false; save(); if (S.fx) celebrate('level'); home(); };
@@ -826,7 +855,7 @@ var App = (function () {
     return '<section class="hero">' +
       '<div class="hrow"><span class="eyebrow">' + greet + ', Alain</span>' + streakChip + '</div>' +
       '<h1 class="htitle">Train your <span>edge</span>.</h1>' +
-      '<p class="hsub mono">' + (today >= goal ? Math.min(today, 999) + ' answers today · goal hit · ' : today + '/' + goal + ' answers today · ') + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
+      '<p class="hsub mono">' + (today >= goal ? Math.min(today, 999) + ' answers today · goal hit · ' : today + '/' + goal + ' answers today · ') + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + (typeof EG !== 'undefined' ? EG.chipHTML() : '') + sparkPath() +
       '<div class="dials">' +
         dial('mkt', '↗', 'Markets', 'Lv ' + (m.level || 1), path.mkt || 0) +
         dial('chess', '&#9822;&#xFE0E;', 'Chess', elo, path.chess || 0) +
@@ -890,6 +919,6 @@ var App = (function () {
     backupScreen: backupScreen, idkBtn: idkBtn, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
-    st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
+    st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, edgeCheck: edgeCheck, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
   };
 })();

@@ -103,12 +103,14 @@ var MM = (function () {
     q.k = k; q.kind = pool === STOCK ? 'Stocks' : 'Sharpener'; return q;
   }
 
-  function drill() {
+  function drill(opt) {
+    opt = opt || {};
     App.screen('Quick Math', function (v) {
       var m = st(), n = 0, right = 0, fastN = 0, timedN = 0, last = null, t0 = 0;
       // which questions get a clock: about 4 of 10, never the first, never three in a row
       var plan = [], k; for (k = 0; k < ROUND; k++) plan.push(k > 0 && Math.random() < TIMED_SHARE && !(plan[k - 1] && plan[k - 2]));
       if (plan.filter(Boolean).length < 2) { plan[3] = true; plan[7] = true; }
+      if (opt.allTimed) plan = plan.map(function (x, i) { return i > 0; });  // edge check: every question after the first is on the clock
       v.innerHTML = '<div class="row"><span class="pill acc">Level ' + m.lv + ' of ' + MAXLV + '</span>' + (m.best ? '<span class="pill">Best ' + m.best + ' / ' + ROUND + '</span>' : '') + '</div><p class="mute small">Ten quick ones: stock math you’ll use on every trade, mixed with everyday sharpeners. Some are timed (' + TARGET[m.lv] + ' s on the clock); the rest have no clock, so take your time. Level up by getting 9 of 10 right and beating most clocks.</p><div id="q"></div>';
       function ask() {
         if (n >= ROUND) return finish();
@@ -143,7 +145,7 @@ var MM = (function () {
         $('#q', v).innerHTML = App.coachHTML('info', '<b>' + right + ' / ' + ROUND + '</b> · beat the clock ' + fastN + ' of ' + timedN + '. ' + (up ? 'Level up: numbers get harder now.' : down ? 'Back to level ' + m.lv + ' to rebuild speed. Accuracy first, then speed.' : right >= 9 ? 'Sharp. Beat more of the clocks to level up.' : 'Read the shortcut on any you missed; the trick is what makes the next one fast.')) +
           '<div class="btns"><button class="btn primary" id="ag">Another round</button><button class="btn" id="dn">Done</button></div>';
         if (up) App.celebrate('level');
-        $('#ag', v).onclick = function () { App.checkpoint(function () { App.back(); drill(); }); };
+        $('#ag', v).onclick = function () { App.checkpoint(function () { App.back(); drill(opt); }); };
         $('#dn', v).onclick = function () { App.checkpoint(App.back); };
       }
       ask();
