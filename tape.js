@@ -251,5 +251,7 @@ var TP = (function () {
       });
     });
   }
+  if (typeof applyDistract === 'function') applyDistract(LESSONS.filter(function (l) { return l.q && l.q.length === 3; }).map(function (l) { return l.q; }), 0, 1);
+  if (typeof applyDistract === 'function') applyDistract(STRATS.filter(function (l) { return l.q && l.q.length === 3; }).map(function (l) { return l.q; }), 0, 1);
   return { home: home, lesson: lesson, LESSONS: LESSONS, strategy: strategy, driverMap: driverMap, readMonth: readMonth, strategies: strategies, research: research, stats: stats, backtest: backtest, STRATS: STRATS, DRIVERS: DRIVERS };
 })();

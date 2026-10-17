@@ -99,6 +99,7 @@ var MK = (function () {
     ['Psychology', 4, 'Confirmation bias in trading looks like…', ['Only reading news that supports your position', 'Using stops', 'Keeping a journal', 'Sizing small'], 'Actively look for the case against your trade. It saves you from big losses.']
   ];
   (App.X().mktQuestions || []).forEach(function (q) { Q.push(q); });
+  if (typeof applyDistract === 'function') applyDistract(Q, 2, 3);
   var TOPICS = ['Basics', 'Orders', 'Risk', 'Charts', 'Momentum', 'Macro', 'Options', 'Valuation', 'Psychology'];
   Q.forEach(function (q) { if (TOPICS.indexOf(q[0]) < 0) TOPICS.push(q[0]); });
   var TITLES = ['Rookie', 'Intern', 'Analyst', 'Associate', 'Trader', 'Senior trader', 'Portfolio manager', 'Head of desk', 'Market wizard'];
@@ -111,30 +112,36 @@ var MK = (function () {
   }
   function xpFor(lv) { return 60 * lv * lv; }
   function topicSkill(t) { var m = st(); return m.topic[t] || 1; } // 1..5
+  var recentQ = []; // the last questions shown, never repeated back-to-back even when the pool is small
   function pickQ() {
     var m = st(), cap = Math.min(5, 1 + Math.floor((m.level - 1) / 1.5));
+    var fresh = function (i) { return recentQ.indexOf(i) < 0; };
     var due = Q.map(function (q, i) { return i; }).filter(function (i) {
       var r = m.q[i]; var q = Q[i];
+      if (!fresh(i)) return false;
       if (q[1] > Math.min(cap, topicSkill(q[0]) + 1)) return false;
       if (!r) return true;
       return r.box < 4 && (m.answered - r.at) >= [3, 4, 8, 15][r.box];
     });
-    if (!due.length) due = Q.map(function (q, i) { return i; }).filter(function (i) { return Q[i][1] <= cap && !(m.q[i] && m.answered - m.q[i].at < 3); });
-    if (!due.length) due = Q.map(function (q, i) { return i; }).filter(function (i) { return Q[i][1] <= cap; });
-    // prefer missed ones, then weakest topics, then new
+    // too few due (e.g. after several misses in a row): widen to anything at your level you haven't just seen
+    if (due.length < 4) due = due.concat(Q.map(function (q, i) { return i; }).filter(function (i) { return fresh(i) && due.indexOf(i) < 0 && Q[i][1] <= Math.max(2, cap) && !(m.q[i] && m.answered - m.q[i].at < 4); }));
+    if (!due.length) due = Q.map(function (q, i) { return i; }).filter(function (i) { return fresh(i) && Q[i][1] <= Math.max(2, cap); });
+    // prefer missed ones (once they're due), then weakest topics, then new
     due.sort(function (a, b) {
       var ra = m.q[a], rb = m.q[b];
       var sa = (ra && ra.box === 0 ? -3 : 0) + topicSkill(Q[a][0]) + (ra ? 1 : 0) + Math.random() * 1.5;
       var sb = (rb && rb.box === 0 ? -3 : 0) + topicSkill(Q[b][0]) + (rb ? 1 : 0) + Math.random() * 1.5;
       return sa - sb;
     });
-    return due[0];
+    var pick = due[0];
+    recentQ.push(pick); if (recentQ.length > 8) recentQ.shift();
+    return pick;
   }
   function record(i, ok, combo) {
     var m = st(), q = Q[i];
     m.answered++; m.today++; if (ok) m.correct++; App.S.session.sinceBreak = 0;
     var r = m.q[i] || { box: 0, at: 0 };
-    r.box = ok ? Math.min(4, r.box + 1) : 0; r.at = m.answered; m.q[i] = r;
+    r.box = ok ? Math.min(4, r.box + 1) : 0; r.at = m.answered; if (!ok) r.miss = (r.miss || 0) + 1; m.q[i] = r;
     var t = m.topic[q[0]] || 1;
     m.topic[q[0]] = Math.max(1, Math.min(5, t + (ok ? (q[1] >= t ? .34 : .15) : -.25)));
     var gain = ok ? (10 + 5 * q[1]) * (1 + Math.min(4, combo) * .25) : 0;
@@ -156,10 +163,16 @@ var MK = (function () {
       if (count && n >= count) return onDone(right, n);
       var m = st(), i = pickQ(), q = Q[i];
       var order = [0, 1, 2, 3].sort(function () { return Math.random() - .5; });
+      // A question you missed before comes back in a different shape (a true/false check of one answer),
+      // so you have to know the idea, not remember which button was right.
+      var rec = m.q[i], tf = !rapid && rec && rec.miss && rec.box < 2 && Math.random() < 0.6;
+      var cand = tf ? (Math.random() < 0.5 ? 0 : 1 + Math.floor(Math.random() * (q[3].length - 1))) : 0;
       var lvPct = Math.round(100 * (m.xp - xpFor(m.level - 1)) / (xpFor(m.level) - xpFor(m.level - 1)));
       container.innerHTML = '<div class="row"><span class="pill acc">' + q[0] + '</span><span class="pill">' + '●'.repeat(q[1]) + '<span class="mute">' + '●'.repeat(5 - q[1]) + '</span></span><span class="grow"></span>' + (combo >= 2 ? '<span class="pill good">×' + (1 + Math.min(4, combo) * .25).toFixed(2) + ' combo</span>' : '') + (rapid ? '<span class="mono small" id="rt"></span>' : '') + '</div>' +
         '<div class="bar"><i style="width:' + Math.max(0, Math.min(100, lvPct)) + '%"></i></div>' +
-        '<h2>' + esc(q[2]) + '</h2><div class="list">' + order.map(function (k) { return '<button class="btn opt" data-k="' + k + '">' + esc(q[3][k]) + '</button>'; }).join('') + App.idkBtn('k') + '</div><div id="fb"></div>' +
+        '<h2>' + esc(q[2]) + '</h2>' + (tf
+          ? '<div class="panel" style="gap:6px"><span class="eyebrow">Second look · is this answer right?</span><p style="font-size:16px">' + esc(q[3][cand]) + '</p></div><div class="list"><button class="btn opt" data-k="' + (cand === 0 ? 0 : 1) + '">Yes, that’s right</button><button class="btn opt" data-k="' + (cand === 0 ? 1 : 0) + '">No, that’s wrong</button>' + App.idkBtn('k') + '</div>'
+          : '<div class="list">' + order.map(function (k) { return '<button class="btn opt" data-k="' + k + '">' + esc(q[3][k]) + '</button>'; }).join('') + App.idkBtn('k') + '</div>') + '<div id="fb"></div>' +
         (count ? '<p class="small mute">' + (n + 1) + ' of ' + count + '</p>' : '');
       var answered = false;
       function answer(k, btn) {
@@ -170,7 +183,7 @@ var MK = (function () {
         $$('[data-k]', container).forEach(function (b) { if (+b.dataset.k === 0) b.classList.add('right'); else if (b === btn) b.classList.add('wrong'); });
         var m2 = st();
         if (rapid && combo > m2.best) { m2.best = combo; App.save(); }
-        $('#fb', container).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', esc(q[4]), ok ? '<span class="mono small">+' + res.gain + ' XP</span>' : '<span class="small mute">It’ll come back after a few other questions.</span>') +
+        $('#fb', container).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', (tf ? '<b>The right answer:</b> ' + esc(q[3][0]) + '<br>' : '') + esc(q[4]), ok ? '<span class="mono small">+' + res.gain + ' XP</span>' : '<span class="small mute">It’ll come back after a few other questions.</span>') +
           (res.up ? App.coachHTML('info', '<b>Promoted to ' + titleOf(m2.level) + '!</b> Level ' + m2.level + '. Harder questions are now in rotation.') + WZ.card('level', true) : '') +
           (m2.today === m2.goal ? App.coachHTML('info', '<b>Daily goal hit: ' + m2.goal + ' questions.</b> Keep going or bank it.') : '') +
           '<button class="btn primary" id="nq" style="width:100%">' + (count && n + 1 >= count ? 'Finish' : 'Next') + '</button>';

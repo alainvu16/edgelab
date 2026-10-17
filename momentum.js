@@ -169,5 +169,6 @@ var MO = (function () {
       $('#sv', v).onclick = function () { var t = $('#jn', v).value.trim(); if (!t) return; m.journal.push({ d: new Date().toISOString().slice(0, 10), t: t }); m.journal = m.journal.slice(-60); App.save(); $('#jn', v).value = ''; showJ(); };
     });
   }
+  if (typeof applyDistract === 'function') applyDistract(LESSONS.filter(function (l) { return l.q && l.q.length === 3; }).map(function (l) { return l.q; }), 0, 1);
   return { home: home, now: now, replay: replay, lesson: lesson, LESSONS: LESSONS, stockGame: stockGame };
 })();

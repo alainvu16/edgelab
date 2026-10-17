@@ -981,6 +981,7 @@ var PK = (function () {
     return out;
   }
   if (typeof App !== 'undefined') App.reg('poker', { home: home, place: place, report: report, quick: quick });
+  if (typeof applyDistract === 'function') { applyDistract(EXTRA_CONCEPTS, 1, 2); applyDistract(READS, 0, 1); }
   return { evalHand: evalHand, cat: cat, chen: chen, equity: equity, outsInfo: outsInfo, GEN: GEN, CAT: CAT, course: course, lessonPK: lessonPK, COURSE: COURSE, drills: drills, botMenu: botMenu, play: play, BOTS: BOTS, courseOpen: courseOpen };
 })();
 if (typeof module !== 'undefined') module.exports = PK;

@@ -68,5 +68,6 @@ var TH = (function () {
       ask();
     });
   }
+  if (typeof applyDistract === 'function') applyDistract(Q, 1, 2);
   return { home: home, quiz: quiz, Q: Q };
 })();

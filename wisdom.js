@@ -218,7 +218,9 @@ var WZ = (function () {
         var w = act[0], b = bx[w[0]] || 0, ways = vs.ways[w[0]] || { m: 0, f: 0, u: 0 };
         recent.push(w[0]); if (recent.length > 3) recent.shift();
         // choose the way: meaning first, then fill-in, then usage; prefer the way least practiced
-        var mode = b === 0 ? 'm' : ['m', 'f', 'u'].sort(function (p, q) { return ways[p] - ways[q] + (Math.random() - .5); })[0];
+        // a word you missed comes back a different way (meaning / fill the gap / right usage), never the same question twice
+        vs.missMode = vs.missMode || {}; var lastMiss = vs.missMode[w[0]];
+        var mode = (b === 0 && !lastMiss) ? 'm' : ['m', 'f', 'u'].filter(function (x) { return x !== lastMiss; }).sort(function (p, q) { return ways[p] - ways[q] + (Math.random() - .5); })[0];
         var dis = WORDS.filter(function (x) { return x !== w && Math.abs(x[1] - w[1]) <= 1; }).sort(function () { return Math.random() - .5; });
         var opts, prompt, label, correct;
         if (mode === 'm') { opts = dis.slice(0, 3).concat([w]).sort(function () { return Math.random() - .5; }).map(function (o) { return { t: o[2], ok: o === w }; }); prompt = esc(w[0]); label = 'What does it mean?'; }
@@ -235,7 +237,8 @@ var WZ = (function () {
             if (done) return; done = true;
             var ok = !!(opts[+btn.dataset.k] || {}).ok; if (ok) right++;
             if (ok) { ways[mode]++; var allWays = ways.m >= 1 && ways.f >= 1 && ways.u >= 1; bx[w[0]] = Math.min(5, b + 1); if (bx[w[0]] >= 4 && !allWays) bx[w[0]] = 3; }
-            else bx[w[0]] = Math.max(0, b - 1);
+            else { bx[w[0]] = Math.max(0, b - 1); vs.missMode = vs.missMode || {}; vs.missMode[w[0]] = mode; }
+            if (ok && vs.missMode && vs.missMode[w[0]]) delete vs.missMode[w[0]];
             vs.ways[w[0]] = ways; vs.n++; vs.seen = vs.seen || {}; vs.seen[w[0]] = Date.now(); App.save();
             $$('[data-k]', v).forEach(function (x) { if ((opts[+x.dataset.k] || {}).ok) x.classList.add('right'); else if (x === btn) x.classList.add('wrong'); });
             $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', '<b>' + esc(w[0]) + '</b>: ' + esc(w[2]) + '<br><span class="mute">“' + esc(w[3]) + '”</span>' + (mode === 'u' && !ok ? '<br><span class="small mute">The other sentences swapped the word into a context where it doesn’t belong. Meaning first, then the company a word keeps.</span>' : '')) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
