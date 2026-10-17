@@ -123,11 +123,15 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .games-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:2px}
 .games{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .game{position:relative;appearance:none;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:3px;padding:14px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,var(--panel2),var(--panel));color:var(--fg);min-width:0}
+.game[data-game="words"]{grid-column:1/-1;order:-1}
 .game .gi{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font:800 18px var(--display);margin-bottom:6px}
 .game .gn{font:700 15px var(--display)}
 .game .gs{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .game .gb{position:absolute;top:12px;right:12px;font:700 11px var(--mono);background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:3px 8px}
 .game:active{transform:scale(.98)}
+/* glossary: tap-to-learn jargon */
+.gl{text-decoration:underline dotted color-mix(in srgb,var(--accent) 80%,transparent);text-decoration-thickness:2px;text-underline-offset:3px;cursor:help}
+#glpop{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:70;max-width:560px;margin:0 auto;background:var(--panel);border:1px solid var(--accent);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:8px;box-shadow:0 12px 40px -12px rgba(0,0,0,.6)}
 /* launch mark */
 #splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;animation:spOut .35s ease .95s forwards;pointer-events:none}
 #splash .mk{display:flex;flex-direction:column;align-items:center;gap:14px}
@@ -252,25 +256,26 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 </div>
 <div id="modal"></div>
 
-<script src="chess.js?v=35"></script>
-<script src="core.js?v=35"></script>
-<script src="content.js?v=35"></script>
-<script src="distract.js?v=35"></script>
-<script src="engine.js?v=35"></script>
-<script src="puzzles.js?v=35"></script>
-<script src="chess-app.js?v=35"></script>
-<script src="xq-engine.js?v=35"></script>
-<script src="xq.js?v=35"></script>
-<script src="poker.js?v=35"></script>
-<script src="mktdata.js?v=35"></script>
-<script src="tapedata.js?v=35"></script>
-<script src="momentum.js?v=35"></script>
-<script src="wisdom.js?v=35"></script>
-<script src="think.js?v=35"></script>
-<script src="macro.js?v=35"></script>
-<script src="tape.js?v=35"></script>
-<script src="markets.js?v=35"></script>
-<script src="roadmap.js?v=35"></script>
+<script src="chess.js?v=37"></script>
+<script src="core.js?v=37"></script>
+<script src="glossary.js?v=37"></script>
+<script src="content.js?v=37"></script>
+<script src="distract.js?v=37"></script>
+<script src="engine.js?v=37"></script>
+<script src="puzzles.js?v=37"></script>
+<script src="chess-app.js?v=37"></script>
+<script src="xq-engine.js?v=37"></script>
+<script src="xq.js?v=37"></script>
+<script src="poker.js?v=37"></script>
+<script src="mktdata.js?v=37"></script>
+<script src="tapedata.js?v=37"></script>
+<script src="momentum.js?v=37"></script>
+<script src="wisdom.js?v=37"></script>
+<script src="think.js?v=37"></script>
+<script src="macro.js?v=37"></script>
+<script src="tape.js?v=37"></script>
+<script src="markets.js?v=37"></script>
+<script src="roadmap.js?v=37"></script>
 <script>
 window.addEventListener('error', function (e) {
   try { (window.__errs = window.__errs || []).push(new Date().toISOString().slice(0, 16) + ' ' + (e.message || e) + (e.filename ? ' @' + e.filename.split('/').pop().split('?')[0] + ':' + e.lineno : '')); if (window.__errs.length > 30) window.__errs.shift(); } catch (x) {}

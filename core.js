@@ -444,6 +444,8 @@ var App = (function () {
     var prog = { chess: ((S.chess.rating || 800) - 600) / 1400, xq: ((S.xq.level || 1) - 1) / 7, poker: ((S.poker.level || 1) - 1) / 11, mkt: ((S.mkt.level || 1) - 1) / 7 };
     var due = (typeof WZ !== 'undefined') ? WZ.dueCount() : 0;
     if (QP.n > 0 && QP.n % 4 === 3 && due >= 2 && QP.last !== 'vocab') return { k: 'vocab', label: 'Vocabulary review', why: due + ' words are due before they fade.', go: function () { WZ.vocab(); }, quota: 1 };
+    // jargon: the words you tapped or missed get drilled for real, in the area you're training most
+    if (QP.n > 0 && QP.n % 3 === 2 && QP.last !== 'words' && typeof GL !== 'undefined' && (GL.dueCount() > 0 || QP.n % 6 === 2)) { var ga = { poker: 'Poker', mkt: 'Trading', chess: 'Chess', xq: 'Xiangqi' }[QP.lastK] || 'Poker'; return { k: 'words', label: 'Words to Know: ' + ga, why: GL.dueCount() ? GL.dueCount() + ' words you tapped or missed, drilled until they stick.' : 'Learn the language of the game: 10 quick words.', go: function () { GL.drill(ga); }, quota: 1 }; }
     if (QP.n > 0 && QP.n % 5 === 4 && QP.last !== 'think' && typeof TH !== 'undefined') return { k: 'think', label: 'Creative questions', why: 'Six quick questions on finding the moves most players never consider.', go: TH.quiz, quota: 1 };
     var best = null;
     ['chess', 'xq', 'poker', 'mkt'].forEach(function (k) {
@@ -459,7 +461,7 @@ var App = (function () {
     a.k = best.k; return a;
   }
   function qpLaunch(a) {
-    QP.last = a.k; QP.lastLabel = a.label; QP.count = 0; QP.quota = a.quota || 1; QP.start = Date.now(); QP.n++;
+    if (['poker', 'mkt', 'chess', 'xq'].indexOf(a.k) >= 0) QP.lastK = a.k; QP.last = a.k; QP.lastLabel = a.label; QP.count = 0; QP.quota = a.quota || 1; QP.start = Date.now(); QP.n++;
     QP.blocks[a.k] = (QP.blocks[a.k] || 0) + 1; QP.cur = a;
     closeModal();
     if (a.k === 'vocab' || a.k === 'think') { tab('home'); } else { curTab = a.k; stack = []; $$('#tabs button').forEach(function (b) { b.setAttribute('aria-current', b.dataset.tab === a.k ? 'true' : 'false'); }); mods[a.k].home(); }
@@ -704,7 +706,7 @@ var App = (function () {
       if ($('#path', v)) $('#path', v).onclick = RM.home;
       if (QP.active) $('#qpstop', v).onclick = function () { qpStop(); home(); };
       $('#fxt', v).onclick = function () { S.fx = S.fx === false; save(); if (S.fx) celebrate('level'); home(); };
-      $$('[data-game]', v).forEach(function (b) { b.onclick = function () { ({ vocab: WZ.vocab, think: TH.quiz, books: WZ.library, wisdom: WZ.wisdomScreen, thinkhome: TH.home })[b.dataset.game](); }; });
+      $$('[data-game]', v).forEach(function (b) { b.onclick = function () { ({ vocab: WZ.vocab, think: TH.quiz, books: WZ.library, wisdom: WZ.wisdomScreen, thinkhome: TH.home, words: function () { GL.drill(); } })[b.dataset.game](); }; });
       if ($('#qod', v).id === 'qod') $('#qod', v).onclick = function () { var m = $('#qodm', v); m.hidden = !m.hidden; };
       $('#reset', v).onclick = function () {
         modal('<h2>Reset all progress?</h2><p class="mute">Levels, ratings and stats go back to the start. A safety copy is kept under Backups, so you can undo this.</p><div class="btns"><button class="btn" id="no">Keep</button><button class="btn primary" id="yes">Reset</button></div>');
@@ -743,6 +745,7 @@ var App = (function () {
       g('think', '?!', 'Outside the Box', th.n ? th.ok + ' of ' + th.n + ' right' : '6 creative questions', '') +
       g('wisdom', '❝', 'Metaphor Match', 'Lines of life and game', '') +
       g('books', '♫', 'Audiobooks', 'Listen while you train', '') +
+      (typeof GL !== 'undefined' ? g('words', 'Ab', 'Words to Know', GL.mastered() + ' of ' + GL.T.length + ' terms mastered', GL.dueCount() ? GL.dueCount() + ' to learn' : '') : '') +
       '</div>';
   }
   function frontHTML(greet) {
