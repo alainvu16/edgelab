@@ -67,17 +67,123 @@ var WZ = (function () {
   function line(kind) { return pickQ(kind).q; }
   var cardN = 0;
   function card(kind, small) {
+    if ((kind === 'win' || kind === 'level') && SG.length) { sageStart(); var x = earnSage(); if (x) return '<div class="' + (small ? 'small ' : '') + '" style="border-top:1px solid var(--line);padding-top:10px;max-width:65ch"><div class="eyebrow">New quote earned · Metaphor Match</div><div style="font-style:italic;margin-top:4px">“' + esc(x.q) + '”</div><div class="small mute" style="margin-top:4px">' + esc(x.who) + ' · ' + esc(x.role) + '</div></div>'; }
     var q = pickQ(kind), id = 'wq' + (++cardN);
     setTimeout(function () { var el = document.getElementById(id); if (!el) return; el.onclick = function () { var m = el.querySelector('.wm'); m.hidden = !m.hidden; }; }, 0);
     return '<div id="' + id + '" class="' + (small ? 'small ' : '') + '" style="border-top:1px solid var(--line);padding-top:10px;max-width:65ch;cursor:pointer"><div class="mute" style="font-style:italic">' + esc(q.q) + '</div><div class="wm small mute" hidden style="margin-top:6px;font-style:normal">' + esc(q.m) + '</div><div class="small mute" style="opacity:.6;margin-top:4px">' + (kind === 'home' ? 'Today’s line · ' : '') + 'tap for the meaning</div></div>';
   }
+  // ---------- sages: real quotes from philosophers, rulers and builders, earned one at a time ----------
+  // Data in sages.js (SAGES rows: [quote, who, role, source, difficulty, meaning, situation]).
+  // Progress is keyed by a hash of the quote text, so adding or reordering quotes never shifts saved progress.
+  // The quote of the day (above) stays the original lines; sages are a separate collection.
+  var SAGE_EVERY = 15;   // graded answers anywhere in the app per new quote
+  var SAGE_START = 5;    // free quotes on the first visit, so the quiz has something to work with
+  function hkey(t) { var v = 0; for (var i = 0; i < t.length; i++) v = (v * 31 + t.charCodeAt(i)) | 0; return 's' + (v >>> 0).toString(36); }
+  var SG = (typeof SAGES !== 'undefined' ? SAGES : []).map(function (r) { return { id: hkey(r[0]), q: r[0], who: r[1], role: r[2], src: r[3], d: r[4], m: r[5], s: r[6] }; });
+  var SGID = {}; SG.forEach(function (x) { SGID[x.id] = x; });
+  // unlock order: easier first; inside a level, mixed across speakers like a salad (no speaker twice in a row)
+  var SGORDER = (function () {
+    var out = [];
+    [1, 2, 3].forEach(function (d) {
+      var pool = SG.filter(function (x) { return x.d === d; }).sort(function (a, b) { return a.id < b.id ? -1 : 1; });
+      while (pool.length) { var last = out.length ? out[out.length - 1].who : ''; var i = 0; while (i < pool.length - 1 && pool[i].who === last) i++; out.push(pool.splice(i, 1)[0]); }
+    });
+    return out;
+  })();
+  function sst() { var s = App.S; if (!s.sage) s.sage = { got: [], tick: 0, box: {}, ways: {}, miss: {}, seen: {}, fresh: {} }; return s.sage; }
+  function sageGot() { var ss = sst(); return ss.got.filter(function (id) { return SGID[id]; }).map(function (id) { return SGID[id]; }); }
+  function earnSage() { // unlock the next quote in order; returns it, or null when the shelf is empty
+    var ss = sst(), have = {}; ss.got.forEach(function (id) { have[id] = 1; });
+    for (var i = 0; i < SGORDER.length; i++) if (!have[SGORDER[i].id]) { ss.got.push(SGORDER[i].id); ss.fresh[SGORDER[i].id] = 1; App.save(); return SGORDER[i]; }
+    return null;
+  }
+  function sageStart() { var ss = sst(); while (ss.got.length < SAGE_START && earnSage()) {} }
+  function sageTick() { // called for every graded answer in the app
+    if (!SG.length || !App.S) return;
+    var ss = sst(); ss.tick = (ss.tick || 0) + 1;
+    if (ss.tick >= SAGE_EVERY) { ss.tick = 0; var x = earnSage(); if (x) App.toast('New quote earned · ' + x.who + ' · Metaphor Match'); }
+  }
+  function sageLeft() { return Math.max(1, SAGE_EVERY - (sst().tick || 0)); }
+  function sageMastered() { var bx = sst().box; return sageGot().filter(function (x) { return (bx[x.id] || 0) >= 4; }).length; }
+  var SG_GAPS = [0, 30 * 60e3, 6 * 3600e3, 2 * 86400e3, 6 * 86400e3, 14 * 86400e3];
+  function sageDue() { var ss = sst(), now = Date.now(); return sageGot().filter(function (x) { var b = ss.box[x.id] || 0; return !ss.seen[x.id] || ss.miss[x.id] || now - ss.seen[x.id] >= SG_GAPS[Math.min(b, 5)]; }).length; }
+  function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  // Question me: who said it · what it means · when it applies. A miss comes back as a true/false second look, then as a different question.
+  function sageQuiz() {
+    sageStart();
+    App.screen('Question me', function (v) {
+      var ss = sst(), got = sageGot(), n = 0, total = Math.min(8, Math.max(4, got.length)), right = 0, recent = [];
+      v.innerHTML = '<div class="row"><span class="pill acc">' + got.length + ' collected</span><span class="pill">' + sageMastered() + ' mastered</span></div><p class="mute small">Each quote comes at you three ways: who said it, what it means, and when it applies. A quote is mastered only when you can do all three, and it keeps coming back on a schedule so it sticks.</p><div id="q"></div>';
+      function pick() {
+        var now = Date.now(), pool = got.filter(function (x) { return recent.indexOf(x.id) < 0; });
+        if (!pool.length) pool = got.slice();
+        pool.forEach(function (x) { var b = ss.box[x.id] || 0, seen = ss.seen[x.id] || 0; x._p = (ss.miss[x.id] ? -3 : 0) + (!seen ? -2 : 0) + (seen && now - seen >= SG_GAPS[Math.min(b, 5)] ? -1 : 0) + b * 0.6 + Math.random() * 1.4; });
+        pool.sort(function (a, b) { return a._p - b._p; });
+        return pool[0];
+      }
+      function ask() {
+        if (n >= total) {
+          $('#q', v).innerHTML = App.coachHTML('info', right + ' of ' + total + '. ' + (right >= total - 1 ? 'Pick one of these lines and use it out loud today, in your own words.' : 'Read the meanings once more; knowing when a line applies is what makes it yours.')) + '<p class="small mute">Next quote in ' + sageLeft() + ' answers anywhere in the app.</p><div class="btns"><button class="btn primary" id="ag">Another round</button><button class="btn" id="dn">Done</button></div>';
+          $('#ag', v).onclick = function () { App.checkpoint(function () { App.back(); sageQuiz(); }); }; $('#dn', v).onclick = function () { App.checkpoint(App.back); }; return;
+        }
+        var x = pick(), b = ss.box[x.id] || 0, ways = ss.ways[x.id] || { w: 0, m: 0, s: 0 }, missed = ss.miss[x.id];
+        recent.push(x.id); if (recent.length > Math.min(4, got.length - 1)) recent.shift();
+        var others = shuffle(SG.filter(function (o) { return o !== x; }));
+        var mode, opts, prompt, label;
+        if (missed && missed.st === 'tf') mode = 't' + missed.a;   // second look: true/false on the part that was missed
+        else mode = ['w', 'm', 's'].filter(function (k) { return !missed || k !== missed.a; }).sort(function (p, q) { return ways[p] - ways[q] + (Math.random() - .5) * 0.9; })[0];   // then a different kind of question
+        if (b === 0 && !missed && !ways.w && !ways.m && !ways.s) mode = 'm';
+        var quote = '<span style="font-style:italic">“' + esc(x.q) + '”</span>';
+        if (mode === 'w') {
+          var names = []; others.forEach(function (o) { if (o.who !== x.who && names.indexOf(o.who) < 0 && names.length < 3) names.push(o.who); });
+          opts = shuffle(names.map(function (t) { return { t: t, ok: false }; }).concat([{ t: x.who, ok: true }])); prompt = quote; label = 'Who said it?';
+        } else if (mode === 'm') {
+          opts = shuffle(others.filter(function (o) { return o.m !== x.m; }).slice(0, 3).map(function (o) { return { t: o.m, ok: false }; }).concat([{ t: x.m, ok: true }])); prompt = quote + '<br><span class="small mute">— ' + esc(x.who) + '</span>'; label = 'What does it mean?';
+        } else if (mode === 's') {
+          var pool = got.filter(function (o) { return o !== x; }); if (pool.length < 3) pool = others;
+          opts = shuffle(shuffle(pool.slice()).slice(0, 3).map(function (o) { return { t: '“' + o.q + '” — ' + o.who, ok: false }; }).concat([{ t: '“' + x.q + '” — ' + x.who, ok: true }])); prompt = esc(x.s); label = 'Which line fits this moment?';
+        } else { // true/false second look on the part that was missed
+          var aspect = mode.slice(1), truth = Math.random() < 0.5, o = others[0];
+          if (aspect === 'w') { var fake = others.filter(function (y) { return y.who !== x.who; })[0]; prompt = quote + '<br><span class="small">Said by <b>' + esc(truth ? x.who : fake.who) + '</b>.</span>'; }
+          else if (aspect === 'm') prompt = quote + '<br><span class="small">Meaning: ' + esc(truth ? x.m : o.m) + '</span>';
+          else prompt = '<span class="small">' + esc(truth ? x.s : o.s) + '</span><br>' + quote + '<br><span class="small mute">This line is the right advice for that moment.</span>';
+          opts = [{ t: 'True', ok: truth }, { t: 'False', ok: !truth }]; label = 'Second look · true or false?';
+        }
+        $('#q', v).innerHTML = '<div class="panel"><span class="eyebrow">' + (n + 1) + ' / ' + total + ' · ' + label + '</span><h2 style="font-size:' + (mode === 's' ? '17px;font-weight:600' : '18px;font-weight:500') + ';line-height:1.45">' + prompt + '</h2><p class="small mute">Box ' + b + ' of 4 · who ' + ways.w + ' · meaning ' + ways.m + ' · when ' + ways.s + '</p></div><div class="list">' + opts.map(function (op, k) { return '<button class="btn opt" data-k="' + k + '" style="text-align:left;font-weight:500">' + esc(op.t) + '</button>'; }).join('') + App.idkBtn('k') + '</div><div id="fb"></div>';
+        var done = false;
+        $$('[data-k]', v).forEach(function (btn) {
+          btn.onclick = function () {
+            if (done) return; done = true;
+            var ok = !!(opts[+btn.dataset.k] || {}).ok; if (ok) right++;
+            if (mode.charAt(0) === 't') { if (ok) ss.miss[x.id] = { a: mode.slice(1), st: 'full' }; /* passed the second look: next time a full question of another kind */ }
+            else if (ok) { ways[mode]++; delete ss.miss[x.id]; ss.box[x.id] = Math.min(5, b + 1); if (ss.box[x.id] >= 4 && !(ways.w && ways.m && ways.s)) ss.box[x.id] = 3; }
+            else { ss.box[x.id] = Math.max(0, b - 1); ss.miss[x.id] = { a: mode, st: 'tf' }; }
+            ss.ways[x.id] = ways; ss.seen[x.id] = Date.now(); delete ss.fresh[x.id]; App.save();
+            $$('[data-k]', v).forEach(function (el) { if ((opts[+el.dataset.k] || {}).ok) el.classList.add('right'); else if (el === btn) el.classList.add('wrong'); });
+            $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', '<i>“' + esc(x.q) + '”</i><br><b>' + esc(x.who) + '</b> · ' + esc(x.role) + ' <span class="mute small">(' + esc(x.src) + ')</span><br>' + esc(x.m) + '<br><span class="small mute">When it applies: ' + esc(x.s) + '</span>') + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
+            $('#nx', v).onclick = function () { n++; ask(); };
+          };
+        });
+      }
+      ask();
+    });
+  }
   function wisdomScreen() {
-    App.screen('Words of wisdom', function (v) {
-      var today = pickQ('home');
+    sageStart();
+    App.screen('Metaphor Match', function (v) {
+      var today = pickQ('home'), ss = sst(), got = sageGot().slice().reverse(), due = sageDue();
       var groups = [['home', 'For the road'], ['win', 'After a win'], ['loss', 'After a loss'], ['level', 'When you level up']];
-      v.innerHTML = '<div><span class="eyebrow">Metaphors of the game and of life</span><h1>Words of wisdom</h1><p class="mute small">One line repeats all day on your home screen. The rest appear after wins, losses and level-ups. Each one carries two readings: what it means on the board, and what it means off it. Read them slowly; let the same line find you more than once.</p></div>' +
+      v.innerHTML = '<div><span class="eyebrow">Metaphors of the game and of life</span><h1>Metaphor Match</h1><p class="mute small">Today’s line stays on your home screen all day. The sages’ quotes are earned: one every ' + SAGE_EVERY + ' answers anywhere in the app, and one with every win or level-up. Then the app questions you on them: who said it, what it means, and when it applies.</p></div>' +
         '<div class="panel" style="border-color:var(--accent)"><span class="eyebrow">Today</span><p style="font-style:italic;font-size:16px">' + esc(today.q) + '</p><p class="small">' + esc(today.m) + '</p></div>' +
-        groups.map(function (g) { return '<h2>' + g[1] + '</h2><div class="list">' + LINES[g[0]].map(function (q) { return '<div class="panel" style="gap:6px"><p style="font-style:italic">' + esc(q[0]) + '</p><p class="small mute">' + esc(q[1]) + '</p></div>'; }).join('') + '</div>'; }).join('');
+        '<div class="panel" style="gap:8px"><span class="eyebrow">The sages · philosophers, kings, generals, builders</span><div class="row"><span class="pill acc">' + got.length + ' of ' + SG.length + ' collected</span><span class="pill">' + sageMastered() + ' mastered</span>' + (due ? '<span class="pill">' + due + ' to review</span>' : '') + '</div>' +
+        '<p class="small mute">' + (got.length < SG.length ? 'Next quote in ' + sageLeft() + ' answers.' : 'You have every quote. Keep them sharp with Question me.') + '</p><button class="btn primary" id="sgq" style="width:100%">Question me</button></div>' +
+        '<h2>Your collection</h2><p class="small mute">Newest first. Tap a quote for its meaning and when it applies.</p><div class="list">' + got.map(function (x) {
+          return '<div class="panel sgc" data-id="' + x.id + '" style="gap:4px;cursor:pointer"><p style="font-style:italic">“' + esc(x.q) + '”</p><p class="small"><b>' + esc(x.who) + '</b> · <span class="mute">' + esc(x.role) + '</span>' + (ss.fresh[x.id] ? ' <span class="pill acc">New</span>' : '') + ((ss.box[x.id] || 0) >= 4 ? ' <span class="pill">Mastered</span>' : '') + '</p><div class="sgm small mute" hidden><p>' + esc(x.m) + '</p><p>When it applies: ' + esc(x.s) + '</p><p style="opacity:.7">Source: ' + esc(x.src) + '</p></div></div>';
+        }).join('') + '</div>' +
+        '<h2>Lines of life and game</h2>' +
+        groups.map(function (g) { return '<h3 style="margin-top:6px">' + g[1] + '</h3><div class="list">' + LINES[g[0]].map(function (q) { return '<div class="panel" style="gap:6px"><p style="font-style:italic">' + esc(q[0]) + '</p><p class="small mute">' + esc(q[1]) + '</p></div>'; }).join('') + '</div>'; }).join('');
+      $('#sgq', v).onclick = sageQuiz;
+      $$('.sgc', v).forEach(function (el) { el.onclick = function () { var m = el.querySelector('.sgm'); m.hidden = !m.hidden; }; });
     });
   }
 
@@ -294,5 +400,5 @@ var WZ = (function () {
     return [{ sev: Math.min(1, n / 10) * 0.7, text: n + ' Word Duel words you missed last time. Each comes back a different way until you get it.', action: 'Word Duel', go: vocab }];
   }
   function dueCount() { var vs = vst(), bx = vs.box, seen = vs.seen || {}, now = Date.now(), gaps = [0, 20 * 60e3, 2 * 3600e3, 12 * 3600e3, 2 * 86400e3, 5 * 86400e3]; return WORDS.filter(function (x) { var b = bx[x[0]] || 0; return b >= 1 && now - (seen[x[0]] || 0) >= gaps[Math.min(b, 5)]; }).length; }
-  return { report: report, today: function () { return pickQ('home'); }, vst: vst, line: line, card: card, library: library, vocab: vocab, WORDS: WORDS, BOOKS: BOOKS, recallModal: recallModal, recallDue: recallDue, dueCount: dueCount, onlineNudge: onlineNudge, wisdomScreen: wisdomScreen };
+  return { report: report, today: function () { return pickQ('home'); }, vst: vst, line: line, card: card, library: library, vocab: vocab, WORDS: WORDS, BOOKS: BOOKS, recallModal: recallModal, recallDue: recallDue, dueCount: dueCount, onlineNudge: onlineNudge, wisdomScreen: wisdomScreen, sageQuiz: sageQuiz, sageTick: sageTick, sageDue: sageDue, sageCount: function () { return sageGot().length; }, sageTotal: SG.length };
 })();

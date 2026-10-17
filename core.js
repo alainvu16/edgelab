@@ -471,7 +471,7 @@ var App = (function () {
 
   // ---------- quick play: the app picks what to train and rotates ----------
   var QP = { active: false, count: 0, quota: 1, start: 0, last: null, lastLabel: '', blocks: {}, n: 0 };
-  var QNAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', vocab: 'Vocabulary', words: 'Words to Know', think: 'Think outside the box' };
+  var QNAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', vocab: 'Vocabulary', words: 'Words to Know', think: 'Think outside the box', sage: 'Metaphor Match' };
   function qname(k) { return QNAME[k] || 'Training'; }
   function qpPick() {
     var prog = { chess: ((S.chess.rating || 800) - 600) / 1400, xq: ((S.xq.level || 1) - 1) / 7, poker: ((S.poker.level || 1) - 1) / 11, mkt: ((S.mkt.level || 1) - 1) / 7 };
@@ -479,6 +479,8 @@ var App = (function () {
     if (QP.n > 0 && QP.n % 4 === 3 && due >= 2 && QP.last !== 'vocab') return { k: 'vocab', label: 'Vocabulary review', why: due + ' words are due before they fade.', go: function () { WZ.vocab(); }, quota: 1 };
     // jargon: the words you tapped or missed get drilled for real, in the area you're training most
     if (QP.n > 0 && QP.n % 3 === 2 && QP.last !== 'words' && typeof GL !== 'undefined' && (GL.dueCount() > 0 || QP.n % 6 === 2)) { var ga = Math.floor(QP.n / 3) % 2 ? 'Everyday' : ({ poker: 'Poker', mkt: 'Trading', chess: 'Chess', xq: 'Xiangqi' }[QP.lastK] || 'Poker'); /* every other words slot: everyday vocabulary */ return { k: 'words', label: 'Words to Know: ' + ga, why: GL.dueCount() ? GL.dueCount() + ' words you tapped or missed, drilled until they stick.' : (ga === 'Everyday' ? 'Sophisticated everyday words: 10 quick ones.' : 'Learn the language of the game: 10 quick words.'), go: function () { GL.drill(ga); }, quota: 1 }; }
+    // quotes you earned: questioned on them every 7th block once there are enough to quiz
+    if (QP.n > 0 && QP.n % 7 === 6 && QP.last !== 'sage' && typeof WZ !== 'undefined' && WZ.sageCount && WZ.sageCount() >= 6 && WZ.sageDue() >= 3) return { k: 'sage', label: 'Quotes: question me', why: WZ.sageDue() + ' of your earned quotes are ready to be tested.', go: WZ.sageQuiz, quota: 1 };
     if (QP.n > 0 && QP.n % 5 === 4 && QP.last !== 'think' && typeof TH !== 'undefined') return { k: 'think', label: 'Creative questions', why: 'Six quick questions on finding the moves most players never consider.', go: TH.quiz, quota: 1 };
     var best = null;
     ['chess', 'xq', 'poker', 'mkt'].forEach(function (k) {
@@ -644,7 +646,7 @@ var App = (function () {
   function tally() {
     if (!S || Date.now() - tallyAt < 400) return false; tallyAt = Date.now();
     var dk = dayKey(new Date()); if (!S.daily || S.daily.d !== dk) S.daily = { d: dk, n: 0 };
-    S.daily.n++; save(); return true;
+    S.daily.n++; if (typeof WZ !== 'undefined' && WZ.sageTick) WZ.sageTick(); save(); return true;
   }
   // Quick play runs until you stop it, so the app watches for fading focus: 3 real misses in a row
   // ("I don't know" doesn't count; new material is allowed to be hard). After one offer, quiet for 10 answers.
@@ -832,12 +834,13 @@ var App = (function () {
   function gamesHTML() {
     var due = 0, tier = 1, mast = 0, th = (S.think || { n: 0, ok: 0 });
     try { due = WZ.dueCount(); var vs = WZ.vst(); tier = vs.tier || 1; mast = WZ.WORDS.filter(function (w) { return (vs.box[w[0]] || 0) >= 4; }).length; } catch (e) {}
+    var sg = { sub: 'Lines of life and game', badge: '' }; try { if (WZ.sageTotal) { sg.sub = WZ.sageCount() + ' of ' + WZ.sageTotal + ' quotes collected'; var sd = WZ.sageCount() ? WZ.sageDue() : 0; sg.badge = sd ? sd + ' to review' : ''; } } catch (e) {}
     function g(key, glyph, name, sub, badge) { return '<button class="game" data-game="' + key + '" aria-label="' + name + ', ' + sub + '"><span class="gi" aria-hidden="true">' + glyph + '</span><span class="gt"><span class="gn">' + name + '</span><span class="gs">' + sub + '</span></span><span class="ge">' + (badge ? '<span class="gb">' + badge + '</span>' : '') + '<span class="gc" aria-hidden="true">›</span></span></button>'; }
     return '<div class="games-h"><h3>Daily games</h3><span class="small mute">Quick rounds that sharpen everything else</span></div><div class="games">' +
       g('vocab', 'Aa', 'Word Duel', 'Tier ' + tier + ' · ' + mast + ' mastered', due ? due + ' due' : '') +
       (typeof GL !== 'undefined' ? g('words', 'Ab', 'Words to Know', GL.mastered() + ' of ' + GL.T.length + ' terms mastered', GL.dueCount() ? GL.dueCount() + ' to learn' : '') : '') +
       g('think', '?!', 'Outside the Box', th.n ? th.ok + ' of ' + th.n + ' right' : '6 creative questions', '') +
-      g('wisdom', '❝&#xFE0E;', 'Metaphor Match', 'Lines of life and game', '') +
+      g('wisdom', '❝&#xFE0E;', 'Metaphor Match', sg.sub, sg.badge) +
       g('books', '♫&#xFE0E;', 'Audiobooks', 'Listen while you train', '') +
       '</div>';
   }
