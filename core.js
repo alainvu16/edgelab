@@ -471,7 +471,7 @@ var App = (function () {
 
   // ---------- quick play: the app picks what to train and rotates ----------
   var QP = { active: false, count: 0, quota: 1, start: 0, last: null, lastLabel: '', blocks: {}, n: 0 };
-  var QNAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', vocab: 'Vocabulary', words: 'Words to Know', think: 'Think outside the box', sage: 'Metaphor Match' };
+  var QNAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', vocab: 'Vocabulary', words: 'Words to Know', think: 'Think outside the box', sage: 'Metaphor Match', math: 'Quick Math' };
   function qname(k) { return QNAME[k] || 'Training'; }
   function qpPick() {
     var prog = { chess: ((S.chess.rating || 800) - 600) / 1400, xq: ((S.xq.level || 1) - 1) / 7, poker: ((S.poker.level || 1) - 1) / 11, mkt: ((S.mkt.level || 1) - 1) / 7 };
@@ -479,6 +479,8 @@ var App = (function () {
     if (QP.n > 0 && QP.n % 4 === 3 && due >= 2 && QP.last !== 'vocab') return { k: 'vocab', label: 'Vocabulary review', why: due + ' words are due before they fade.', go: function () { WZ.vocab(); }, quota: 1 };
     // jargon: the words you tapped or missed get drilled for real, in the area you're training most
     if (QP.n > 0 && QP.n % 3 === 2 && QP.last !== 'words' && typeof GL !== 'undefined' && (GL.dueCount() > 0 || QP.n % 6 === 2)) { var ga = Math.floor(QP.n / 3) % 2 ? 'Everyday' : ({ poker: 'Poker', mkt: 'Trading', chess: 'Chess', xq: 'Xiangqi' }[QP.lastK] || 'Poker'); /* every other words slot: everyday vocabulary */ return { k: 'words', label: 'Words to Know: ' + ga, why: GL.dueCount() ? GL.dueCount() + ' words you tapped or missed, drilled until they stick.' : (ga === 'Everyday' ? 'Sophisticated everyday words: 10 quick ones.' : 'Learn the language of the game: 10 quick words.'), go: function () { GL.drill(ga); }, quota: 1 }; }
+    // quick mental math (stocks + everyday): every 5th block
+    if (QP.n > 0 && QP.n % 5 === 1 && QP.last !== 'math' && typeof MM !== 'undefined') return { k: 'math', label: 'Quick Math', why: 'Ten fast ones: stock math and mental sharpeners, some against the clock.', go: MM.drill, quota: 1 };
     // quotes you earned: questioned on them every 7th block once there are enough to quiz
     if (QP.n > 0 && QP.n % 7 === 6 && QP.last !== 'sage' && typeof WZ !== 'undefined' && WZ.sageCount && WZ.sageCount() >= 6 && WZ.sageDue() >= 3) return { k: 'sage', label: 'Quotes: question me', why: WZ.sageDue() + ' of your earned quotes are ready to be tested.', go: WZ.sageQuiz, quota: 1 };
     if (QP.n > 0 && QP.n % 5 === 4 && QP.last !== 'think' && typeof TH !== 'undefined') return { k: 'think', label: 'Creative questions', why: 'Six quick questions on finding the moves most players never consider.', go: TH.quiz, quota: 1 };
@@ -719,62 +721,32 @@ var App = (function () {
       ['Xiangqi bot', 'Lv ' + (x.level || 1)], ['Poker', 'Lv ' + (p.level || 1)], ['Markets', 'Lv ' + (m.level || 1)]
     ].map(function (a) { return '<div class="stat"><span class="v">' + a[1] + '</span><span class="k">' + a[0] + '</span></div>'; }).join('');
   }
-  var planCache = null;
-  function dailyPlan() {
-    var items = [], sug = suggestion();
-    var due = (typeof WZ !== 'undefined') ? WZ.dueCount() : 0;
-    if (due) items.push({ min: 3, text: 'Review ' + due + ' vocabulary word' + (due > 1 ? 's' : '') + ' that are due', go: function () { WZ.vocab(); } });
-    var weakest = { chess: 'Chess: puzzles on your weakest theme', xq: 'Xiangqi: a coached game and the move trainer', poker: 'Poker: drills on your weakest type', mkt: 'Markets: 15 adaptive questions' }[sug[0]];
-    items.push({ min: 10, text: weakest, go: function () { tab(sug[0]); } });
-    var second = ['chess', 'xq', 'poker', 'mkt'].filter(function (k) { return k !== sug[0]; }).sort(function (a, b) { return hoursOf(a) - hoursOf(b); })[0];
-    items.push({ min: 10, text: { chess: 'Chess: one coached game', xq: 'Xiangqi: characters, then a game', poker: 'Poker: a heads-up match', mkt: 'Markets: Rotation Replay on real data' }[second], go: function () { tab(second); } });
-    items.push({ min: 5, text: 'Markets: Event Replay or Macro Desk chain', go: function () { tab('mkt'); if (typeof MC !== 'undefined') MC.home(); } });
-    items.push({ min: 2, text: 'Read today’s line and one new word, out loud', go: function () { WZ.wisdomScreen(); } });
-    planCache = items; return items;
-  }
-  function suggestion() {
-    var c = S.chess, x = S.xq, p = S.poker, m = S.mkt;
-    var prog = [
-      ['chess', 'Chess', ((c.rating || 800) - 600) / 1400],
-      ['xq', 'Xiangqi', ((x.level || 1) - 1) / 5],
-      ['poker', 'Poker', ((p.level || 1) - 1) / 11],
-      ['mkt', 'Markets', ((m.level || 1) - 1) / 7]
-    ];
-    prog.sort(function (a, b) { return a[2] - b[2]; });
-    return prog[0];
-  }
   function home() {
     root('Home', function (v) {
       var hr = new Date().getHours();
       var greet = hr < 5 ? 'Late session' : hr < 12 ? 'Morning' : hr < 18 ? 'Afternoon' : 'Evening';
-      var sug = suggestion();
       var ss = S.session;
       v.innerHTML =
         quoteHTML() + frontHTML(greet) + gamesHTML() +
         (progressScore(S) === 0 ? '<button class="item" id="rsc"><span class="grow"><span class="t">Moving from another device?</span><br><span class="s">Paste your backup code to bring your progress here.</span></span><span class="end">›</span></button>' : '') +
         (QP.active ? '<div class="row"><button class="btn sm ghost" id="qpstop">Stop quick play</button></div>' : '') +
-        (typeof RM !== 'undefined' ? '<button class="item" id="path" style="flex-direction:column;align-items:stretch;gap:6px"><div class="row"><span class="t grow">Your path to an edge</span><span class="end">›</span></div>' + RM.summary().map(function (r) { return '<div class="row small"><span style="width:62px">' + r.name + '</span><div class="bar grow"><i style="width:' + Math.round(r.pct * 100) + '%"></i></div><span class="mute" style="width:118px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.done ? 'Edge reached' : r.stageName) + '</span></div>'; }).join('') + '</button>' : '') +
-        (ss.active ? '' : '<div class="panel"><h3>Start a session</h3><p class="mute small">Set a time box so you train sharp and stop before you burn out.</p><div class="btns">' +
-          [15, 30, 45, 60].map(function (m) { return '<button class="btn' + (m === 30 ? ' primary' : '') + '" data-s="' + m + '">' + m + ' min</button>'; }).join('') + '</div></div>') +
-        '<div class="panel"><span class="eyebrow">Next up</span><h2>' + sug[1] + ' is your weakest area</h2><p class="mute small">Everything levels up as you get things right, and slows down when you miss.</p><button class="btn primary" id="go">Train ' + sug[1] + '</button></div>' +
         focusHTML() +
-        '<div class="panel"><span class="eyebrow">Today’s 30 minutes</span><div class="list" style="gap:6px">' + dailyPlan().map(function (it, i) { return '<button class="item" data-dp="' + i + '" style="padding:9px 12px"><span class="pill" style="min-width:44px;justify-content:center">' + it.min + 'm</span><span class="grow small">' + it.text + '</span><span class="end">›</span></button>'; }).join('') + '</div></div>' +
-        '<div class="panel"><span class="eyebrow">Hours toward ' + HOUR_GOAL + ' each</span><div class="list" style="gap:6px">' + [['chess', 'Chess'], ['xq', 'Xiangqi'], ['poker', 'Poker'], ['mkt', 'Markets']].map(function (t) { var h = hoursOf(t[0]); return '<div class="row"><span class="small" style="width:70px">' + t[1] + '</span><div class="bar grow"><i style="width:' + Math.min(100, h / HOUR_GOAL * 100) + '%"></i></div><span class="mono small mute" style="width:52px;text-align:right">' + (h < 1 ? Math.round(h * 60) + 'm' : h.toFixed(1) + 'h') + '</span></div>'; }).join('') + '</div><p class="small mute">Counts time you are actively training. Each track holds roughly 25 hours of structured material, and the bots, puzzles and replays keep going after that.</p></div>' +
-        '<div class="panel"><span class="eyebrow">Your levels</span><div class="stats">' + levelStats() + '</div></div>' +
+        (typeof RM !== 'undefined' ? '<button class="item" id="path" style="flex-direction:column;align-items:stretch;gap:6px"><div class="row"><span class="t grow">Your path to an edge</span><span class="end">›</span></div>' + RM.summary().map(function (r) { return '<div class="row small"><span style="width:62px">' + r.name + '</span><div class="bar grow"><i style="width:' + Math.round(r.pct * 100) + '%"></i></div><span class="mute" style="width:118px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.done ? 'Edge reached' : r.stageName) + '</span></div>'; }).join('') + '</button>' : '') +
+        // Oct 17 (v56): Home kept short. Quick play does what Start a session / Next up / Today’s 30 minutes used to; stats sit folded.
+        '<details class="panel more"><summary class="eyebrow" style="cursor:pointer">More stats</summary>' +
+        '<div><span class="eyebrow">Hours toward ' + HOUR_GOAL + ' each</span><div class="list" style="gap:6px">' + [['chess', 'Chess'], ['xq', 'Xiangqi'], ['poker', 'Poker'], ['mkt', 'Markets']].map(function (t) { var h = hoursOf(t[0]); return '<div class="row"><span class="small" style="width:70px">' + t[1] + '</span><div class="bar grow"><i style="width:' + Math.min(100, h / HOUR_GOAL * 100) + '%"></i></div><span class="mono small mute" style="width:52px;text-align:right">' + (h < 1 ? Math.round(h * 60) + 'm' : h.toFixed(1) + 'h') + '</span></div>'; }).join('') + '</div><p class="small mute">Counts time you are actively training. Each track holds roughly 25 hours of structured material, and the bots, puzzles and replays keep going after that.</p></div>' +
+        '<div style="margin-top:10px"><span class="eyebrow">Your levels</span><div class="stats">' + levelStats() + '</div></div>' +
+        '<p class="mute mono" style="font-size:10px;opacity:.6;margin-top:10px">screen ' + screen.width + '×' + screen.height + ' · view ' + innerWidth + '×' + innerHeight + (window.visualViewport ? ' · vv ' + Math.round(visualViewport.height) : '') + (navigator.standalone ? ' · app' : '') + '</p>' + '</details>' +
         '<div class="row"><button class="btn sm ghost" id="sess">Session &amp; break settings</button><button class="btn sm ghost" id="bk">Backups</button><button class="btn sm ghost" id="reset">Reset progress</button><button class="btn sm ghost" id="fxt">Celebrations: ' + (S.fx === false ? 'off' : 'on') + '</button><span class="small mute" id="cs">' + (cloudStatus === 'ok' ? 'Progress synced to your account' : cloudStatus === 'err' ? 'Saved on this device only' : 'Saved on this device') + '</span></div>' +
-        '<p class="small mute">Market questions are for learning, not investment advice. Practice charts use simulated prices.</p>' +
-        '<p class="mute mono" style="font-size:10px;opacity:.6">screen ' + screen.width + '×' + screen.height + ' · view ' + innerWidth + '×' + innerHeight + (window.visualViewport ? ' · vv ' + Math.round(visualViewport.height) : '') + (navigator.standalone ? ' · app' : '') + '</p>';
-      $$('[data-s]', v).forEach(function (b) { b.onclick = function () { startSession(+b.dataset.s); home(); }; });
-      $('#go', v).onclick = function () { tab(sug[0]); };
+        '<p class="small mute">Market questions are for learning, not investment advice. Practice charts use simulated prices.</p>';
       $$('[data-go]', v).forEach(function (b) { b.onclick = function () { tab(b.dataset.go); }; });
-      $$('[data-dp]', v).forEach(function (b) { b.onclick = function () { planCache[+b.dataset.dp].go(); }; });
       $$('[data-wk]', v).forEach(function (b) { b.onclick = function () { focusCache[+b.dataset.wk].r.go(); }; });
       $('#sess', v).onclick = sessionSheet; if ($('#rsc', v)) $('#rsc', v).onclick = backupScreen; $('#bk', v).onclick = backupScreen;
       $('#qp', v).onclick = function () { if (QP.active) qpNext(); else quickPlay(); };
       if ($('#path', v)) $('#path', v).onclick = RM.home;
       if (QP.active) $('#qpstop', v).onclick = function () { qpStop(); home(); };
       $('#fxt', v).onclick = function () { S.fx = S.fx === false; save(); if (S.fx) celebrate('level'); home(); };
-      $$('[data-game]', v).forEach(function (b) { b.onclick = function () { ({ vocab: WZ.vocab, think: TH.quiz, books: WZ.library, wisdom: WZ.wisdomScreen, thinkhome: TH.home, words: function () { GL.drill(); } })[b.dataset.game](); }; });
+      $$('[data-game]', v).forEach(function (b) { b.onclick = function () { ({ vocab: WZ.vocab, think: TH.quiz, books: WZ.library, wisdom: WZ.wisdomScreen, math: function () { MM.drill(); }, thinkhome: TH.home, words: function () { GL.drill(); } })[b.dataset.game](); }; });
       if ($('#qod', v).id === 'qod') $('#qod', v).onclick = function () { var m = $('#qodm', v); m.hidden = !m.hidden; };
       $('#reset', v).onclick = function () {
         modal('<h2>Reset all progress?</h2><p class="mute">Levels, ratings and stats go back to the start. A safety copy is kept under Backups, so you can undo this.</p><div class="btns"><button class="btn" id="no">Keep</button><button class="btn primary" id="yes">Reset</button></div>');
@@ -840,6 +812,7 @@ var App = (function () {
       g('vocab', 'Aa', 'Word Duel', 'Tier ' + tier + ' · ' + mast + ' mastered', due ? due + ' due' : '') +
       (typeof GL !== 'undefined' ? g('words', 'Ab', 'Words to Know', GL.mastered() + ' of ' + GL.T.length + ' terms mastered', GL.dueCount() ? GL.dueCount() + ' to learn' : '') : '') +
       g('think', '?!', 'Outside the Box', th.n ? th.ok + ' of ' + th.n + ' right' : '6 creative questions', '') +
+      (typeof MM !== 'undefined' ? g('math', '%', 'Quick Math', MM.summary(), '') : '') +
       g('wisdom', '❝&#xFE0E;', 'Metaphor Match', sg.sub, sg.badge) +
       g('books', '♫&#xFE0E;', 'Audiobooks', 'Listen while you train', '') +
       '</div>';
