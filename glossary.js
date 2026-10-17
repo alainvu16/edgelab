@@ -222,7 +222,11 @@ var GL = (function () {
           $('#dn', v).onclick = function () { App.checkpoint(App.back); };
           return;
         }
-        var p = pool(), i = p[0], t = T[i]; recent.push(i); if (recent.length > 4) recent.shift();
+        var p = pool(); if (!p.length) { recent = []; p = pool(); }
+        var i = p[0], t = T[i]; recent.push(i);
+        // never repeat a word within a few questions, but small areas (Xiangqi) need room to rotate
+        var areaSize = T.filter(function (x) { return x[2].indexOf(focus) >= 0; }).length;
+        while (recent.length > Math.min(4, Math.max(1, areaSize - 2))) recent.shift();
         var same = T.map(function (x, j) { return j; }).filter(function (j) { return j !== i && T[j][2].indexOf(focus) >= 0; });
         // a missed word comes back in a different way than the one you missed
         var modes = ['def', 'term'].concat(t[4] ? ['ex'] : []).filter(function (m) { return m !== g.mode[i]; });

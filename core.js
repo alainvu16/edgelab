@@ -464,7 +464,7 @@ var App = (function () {
     if (['poker', 'mkt', 'chess', 'xq'].indexOf(a.k) >= 0) QP.lastK = a.k; QP.last = a.k; QP.lastLabel = a.label; QP.count = 0; QP.quota = a.quota || 1; QP.start = Date.now(); QP.n++;
     QP.blocks[a.k] = (QP.blocks[a.k] || 0) + 1; QP.cur = a;
     closeModal();
-    if (a.k === 'vocab' || a.k === 'think') { tab('home'); } else { curTab = a.k; stack = []; $$('#tabs button').forEach(function (b) { b.setAttribute('aria-current', b.dataset.tab === a.k ? 'true' : 'false'); }); mods[a.k].home(); }
+    if (!mods[a.k]) { tab('home'); } else { curTab = a.k; stack = []; $$('#tabs button').forEach(function (b) { b.setAttribute('aria-current', b.dataset.tab === a.k ? 'true' : 'false'); }); mods[a.k].home(); }
     a.go();
     toast('Quick play · ' + a.label);
   }
