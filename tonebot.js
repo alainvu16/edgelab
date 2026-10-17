@@ -246,6 +246,13 @@ var TB = (function () {
   }
   // second looks are due across the whole course: serve them before the next new lesson
   function dueSecondLooks() { var cq = cqState(); return ((C && C.quiz) || []).filter(function (q) { var s = (cq[q.id] || {}).s; return s === 'tf' || s === 'mc2'; }); }
+  function report() {
+    if (!hasCourse()) return [];
+    var due = dueSecondLooks(); if (due.length < 2) return [];
+    var by = {}; due.forEach(function (q) { by[q.track] = (by[q.track] || 0) + 1; });
+    var tr = Object.keys(by).sort(function (a, b) { return by[b] - by[a]; })[0];
+    return [{ sev: Math.min(1, due.length / 10) * 0.9, text: due.length + ' ToneBot course questions you missed' + (tr ? ', mostly in <b>' + esc(splitT(tr)[0]) + '</b>' : '') + '.', action: 'Second look', go: function () { runQuiz(due.slice(0, 6).map(function (q) { return { q: q, tf: (cqState()[q.id] || {}).s === 'tf' }; }), 'Second look', function () { courseNext(''); }); } }];
+  }
   function courseContinue(start) {
     var due = dueSecondLooks().filter(function (q) { return !start || q.track.indexOf(start) === 0; });
     if (due.length >= 3) runQuiz(due.slice(0, 4).map(function (q) { return { q: q, tf: (cqState()[q.id] || {}).s === 'tf' }; }), 'Second look', function () { courseNext(start); });
@@ -428,5 +435,5 @@ var TB = (function () {
   function recShort() { var r = record(graded()); return r.n ? r.avg + '/100 avg over ' + r.n + ' days' : 'no graded days yet'; }
   function drillStatus() { var day = drillDay(); return ds()[day] ? 'Drill locked for ' + nice(day) : (windowOpen() ? 'Drill open until 9:25 AM ET' : 'Next drill: ' + nice(day)); }
 
-  return { home: home, course: course, courseContinue: courseContinue, courseProgress: courseProgress, hasQuiz: hasCourse, lessonsDone: function () { return L.length ? L.filter(function (l) { return st().done[l.id]; }).length / L.length : null; }, nextLesson: function () { var i = L.findIndex(function (l) { return !st().done[l.id]; }); if (i >= 0) lesson(i); }, lesson: lesson, replay: replay, myCall: drill, drill: drill, drillStatus: drillStatus, refresh: refresh, count: function () { return L.length; }, done: function () { return L.filter(function (l) { return st().done[l.id]; }).length; } };
+  return { report: report, home: home, course: course, courseContinue: courseContinue, courseProgress: courseProgress, hasQuiz: hasCourse, lessonsDone: function () { return L.length ? L.filter(function (l) { return st().done[l.id]; }).length / L.length : null; }, nextLesson: function () { var i = L.findIndex(function (l) { return !st().done[l.id]; }); if (i >= 0) lesson(i); }, lesson: lesson, replay: replay, myCall: drill, drill: drill, drillStatus: drillStatus, refresh: refresh, count: function () { return L.length; }, done: function () { return L.filter(function (l) { return st().done[l.id]; }).length; } };
 })();

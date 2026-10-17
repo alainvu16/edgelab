@@ -365,8 +365,8 @@ var MK = (function () {
   }
   function report() {
     var m = st(), out = [];
-    var weak = TOPICS.slice().sort(function (a, b) { return topicSkill(a) - topicSkill(b); });
-    if (m.answered >= 10) out.push({ sev: 1 - topicSkill(weak[0]) / 5, text: 'Weakest topics: <b>' + weak[0] + '</b> and <b>' + weak[1] + '</b>. Questions lean on them until the skill bars catch up.', action: 'Keep learning', go: function () { App.screen('Learning', function (vv) { runQuiz(vv, 0, function () {}); }); } });
+    var weak = TOPICS.filter(function (t) { return m.topic[t] != null; }).sort(function (a, b) { return topicSkill(a) - topicSkill(b); });
+    if (m.answered >= 10 && weak.length) out.push({ sev: 1 - topicSkill(weak[0]) / 5, text: 'Weakest topic' + (weak[1] ? 's' : '') + ': <b>' + weak[0] + '</b>' + (weak[1] ? ' and <b>' + weak[1] + '</b>' : '') + '. Questions lean on them until the skill bars catch up.', action: 'Keep learning', go: function () { App.screen('Learning', function (vv) { runQuiz(vv, 0, function () {}); }); } });
     var missed = Object.keys(m.q || {}).filter(function (i) { return m.q[i].box === 0; }).length;
     if (missed >= 3) out.push({ sev: Math.min(1, missed / 10), text: missed + ' questions you missed are queued to come back until you get them right twice.', action: 'Review now', go: function () { App.screen('Learning', function (vv) { runQuiz(vv, 0, function () {}); }); } });
     if (m.simN >= 5 && m.simR / m.simN < 0) out.push({ sev: 0.5, text: 'Chart practice is net negative (' + m.simR.toFixed(1) + 'R over ' + m.simN + '). Trade less: when the chart is choppy, staying flat is the pro move.', action: 'Chart practice', go: simScreen });

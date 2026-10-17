@@ -305,7 +305,7 @@ var GL = (function () {
     try { var g = gst(); g.tapped[i] = Date.now(); g.box[i] = 0; App.save(); } catch (e) {}
     var old = document.getElementById('glpop'); if (old) old.remove();
     var d = document.createElement('div'); d.id = 'glpop'; d.setAttribute('role', 'dialog');
-    d.innerHTML = '<div class="row"><span class="pill acc">' + App.esc(t[2]) + '</span><b class="grow" style="font-size:16px">' + App.esc(t[0]) + '</b><button class="btn sm ghost" id="glx" aria-label="Close">✕</button></div><p>' + App.esc(t[3]) + '</p>' + (t[4] ? '<p class="small mute"><b>Example:</b> ' + App.esc(t[4]) + '</p>' : '') + '<button class="btn sm ghost" id="glall">All ' + App.esc(t[2].split(' ')[0].toLowerCase()) + ' words ›</button>';
+    d.innerHTML = '<div class="row"><span class="pill acc">' + App.esc(t[2]) + '</span><b class="grow" style="font-size:16px">' + App.esc(t[0]) + '</b>' + App.sayBtn(t[0]) + '<button class="btn sm ghost" id="glx" aria-label="Close">✕</button></div><p>' + App.esc(t[3]) + '</p>' + (t[4] ? '<p class="small mute"><b>Example:</b> ' + App.esc(t[4]) + '</p>' : '') + '<button class="btn sm ghost" id="glall">All ' + App.esc(t[2].split(' ')[0].toLowerCase()) + ' words ›</button>';
     document.body.appendChild(d);
     d.querySelector('#glx').onclick = function () { d.remove(); };
     d.querySelector('#glall').onclick = function () { d.remove(); screen(t[2].split(' ')[0]); };
@@ -319,7 +319,7 @@ var GL = (function () {
       v.innerHTML = '<div><span class="eyebrow">Plain-English dictionary</span><h1>Words to know</h1><p class="mute small">Tap any underlined word anywhere in the app to see its meaning. Here is the full list.</p></div><div class="seg" id="gla">' + areas.map(function (a) { return '<button data-a="' + a + '" aria-pressed="' + (a === cur) + '">' + a + '</button>'; }).join('') + '</div><div class="list" id="gll"></div>';
       function list(a) {
         $$('#gla [data-a]', v).forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.a === a); });
-        $('#gll', v).innerHTML = T.filter(function (t) { return t[2].indexOf(a) >= 0; }).map(function (t) { return '<div class="panel" style="gap:4px"><b>' + App.esc(t[0]) + '</b><p class="small">' + App.esc(t[3]) + '</p>' + (t[4] ? '<p class="small mute">' + App.esc(t[4]) + '</p>' : '') + '</div>'; }).join('');
+        $('#gll', v).innerHTML = T.filter(function (t) { return t[2].indexOf(a) >= 0; }).map(function (t) { return '<div class="panel" style="gap:4px"><div class="row"><b class="grow">' + App.esc(t[0]) + '</b>' + App.sayBtn(t[0]) + '</div><p class="small">' + App.esc(t[3]) + '</p>' + (t[4] ? '<p class="small mute">' + App.esc(t[4]) + '</p>' : '') + '</div>'; }).join('');
       }
       $$('#gla [data-a]', v).forEach(function (b) { b.onclick = function () { list(b.dataset.a); }; });
       list(cur);
@@ -336,6 +336,14 @@ var GL = (function () {
   function short(def) { var m = def.match(/^[^.:]*[.:]/); var cut = m ? m[0] : def; return cut.length > 24 ? cut : def; }
   function dueCount() { var g = gst(); return Object.keys(g.tapped).filter(function (i) { return (g.box[i] || 0) < 3; }).length; }
   function mastered(area) { var g = gst(); return T.filter(function (t, i) { return (!area || t[2].indexOf(area) >= 0) && (g.box[i] || 0) >= 3; }).length; }
+  // where you need work: the area with the most words you missed last time you saw them
+  function report() {
+    var g = gst(), mode = g.mode || {}, by = {};
+    Object.keys(mode).forEach(function (i) { var t = T[+i]; if (t && (g.box[i] || 0) === 0) by[t[2]] = (by[t[2]] || 0) + 1; });
+    var a = Object.keys(by).sort(function (x, y) { return by[y] - by[x]; })[0];
+    if (!a || by[a] < 3) return [];
+    return [{ sev: Math.min(1, by[a] / 10) * 0.8, text: by[a] + ' ' + a.toLowerCase() + ' words you missed are waiting to come back.', action: a + ' words', go: function () { drill(a); } }];
+  }
   function drill(area) {
     App.screen('Words to Know', function (v) {
       var g = gst(), n = 0, N = 10, right = 0, recent = [], focus = area || 'Poker';
@@ -368,7 +376,7 @@ var GL = (function () {
           var L = short(t[3]).length;
           var d = same.slice().sort(function (a, b) { return Math.abs(short(T[a][3]).length - L) - Math.abs(short(T[b][3]).length - L) + (Math.random() - .5) * 20; }).slice(0, 3);
           opts = [i].concat(d).map(function (j) { return { j: j, txt: mask(short(T[j][3]), T[j]) }; });
-          label = 'What does it mean?'; prompt = App.esc(t[0]);
+          label = 'What does it mean?'; prompt = App.esc(t[0]) + App.sayBtn(t[0]);
         } else {
           var d2 = same.sort(function () { return Math.random() - .5; }).slice(0, 3);
           opts = [i].concat(d2).map(function (j) { return { j: j, txt: T[j][0] }; });
@@ -387,7 +395,7 @@ var GL = (function () {
             g.n++; if (ok) { g.ok++; right++; g.box[i] = Math.min(5, (g.box[i] || 0) + 1); delete g.mode[i]; } else { g.box[i] = 0; g.mode[i] = mode; g.tapped[i] = g.tapped[i] || Date.now(); }
             App.save();
             $$('[data-k]', v).forEach(function (x) { var oo = opts[+x.dataset.k]; if (oo && oo.j === i) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
-            $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', '<b>' + App.esc(t[0]) + ':</b> ' + App.esc(t[3]) + (t[4] ? '<br><span class="mute">Example: ' + App.esc(t[4]) + '</span>' : '') + (ok ? '' : '<br><span class="small mute">It comes back in a few questions, asked a different way.</span>')) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
+            $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', '<b>' + App.esc(t[0]) + '</b>' + App.sayBtn(t[0]) + '<br>' + App.esc(t[3]) + (t[4] ? '<br><span class="mute">Example: ' + App.esc(t[4]) + '</span>' : '') + (ok ? '' : '<br><span class="small mute">It comes back in a few questions, asked a different way.</span>')) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
             $('#nx', v).onclick = function () { n++; ask(); };
           };
         });
@@ -406,5 +414,5 @@ var GL = (function () {
   var obs = new MutationObserver(function () { if (pend) return; pend = setTimeout(function () { pend = null; try { wrap(document.getElementById('view')); wrap(document.getElementById('modal')); } catch (e) {} }, 40); });
   function start() { var m = document.getElementById('main'), md = document.getElementById('modal'); if (m) obs.observe(m, { childList: true, subtree: true, characterData: false }); if (md) obs.observe(md, { childList: true, subtree: true }); wrap(document.getElementById('view')); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
-  return { T: T, screen: screen, wrap: wrap, show: show, drill: drill, dueCount: dueCount, mastered: mastered };
+  return { report: report, T: T, screen: screen, wrap: wrap, show: show, drill: drill, dueCount: dueCount, mastered: mastered };
 })();

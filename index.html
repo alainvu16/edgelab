@@ -78,6 +78,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .item{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;text-align:left;color:var(--fg);font:inherit;width:100%}
 .item .t{font-weight:600}
 .item .s{font-size:13px;color:var(--mute)}
+.say{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;margin-left:6px;vertical-align:middle;border-radius:50%;border:1px solid var(--line);background:var(--panel);color:var(--accent);cursor:pointer;flex:none;-webkit-tap-highlight-color:transparent}
+.say:active{transform:scale(.92)}
 .item .end{margin-left:auto;font-family:var(--mono);font-size:13px;color:var(--mute);white-space:nowrap}
 .item.locked{opacity:.5;cursor:default}
 .item.done .end{color:var(--good)}
@@ -262,27 +264,27 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 </div>
 <div id="modal"></div>
 
-<script src="chess.js?v=51"></script>
-<script src="core.js?v=51"></script>
-<script src="glossary.js?v=51"></script>
-<script src="content.js?v=51"></script>
-<script src="distract.js?v=51"></script>
-<script src="engine.js?v=51"></script>
-<script src="puzzles.js?v=51"></script>
-<script src="chess-app.js?v=51"></script>
-<script src="xq-engine.js?v=51"></script>
-<script src="xq.js?v=51"></script>
-<script src="poker.js?v=51"></script>
-<script src="mktdata.js?v=51"></script>
-<script src="tapedata.js?v=51"></script>
-<script src="momentum.js?v=51"></script>
-<script src="wisdom.js?v=51"></script>
-<script src="think.js?v=51"></script>
-<script src="macro.js?v=51"></script>
-<script src="tape.js?v=51"></script>
-<script src="tonebot.js?v=51"></script>
-<script src="markets.js?v=51"></script>
-<script src="roadmap.js?v=51"></script>
+<script src="chess.js?v=52"></script>
+<script src="core.js?v=52"></script>
+<script src="glossary.js?v=52"></script>
+<script src="content.js?v=52"></script>
+<script src="distract.js?v=52"></script>
+<script src="engine.js?v=52"></script>
+<script src="puzzles.js?v=52"></script>
+<script src="chess-app.js?v=52"></script>
+<script src="xq-engine.js?v=52"></script>
+<script src="xq.js?v=52"></script>
+<script src="poker.js?v=52"></script>
+<script src="mktdata.js?v=52"></script>
+<script src="tapedata.js?v=52"></script>
+<script src="momentum.js?v=52"></script>
+<script src="wisdom.js?v=52"></script>
+<script src="think.js?v=52"></script>
+<script src="macro.js?v=52"></script>
+<script src="tape.js?v=52"></script>
+<script src="tonebot.js?v=52"></script>
+<script src="markets.js?v=52"></script>
+<script src="roadmap.js?v=52"></script>
 <script>
 window.addEventListener('error', function (e) {
   try { (window.__errs = window.__errs || []).push(new Date().toISOString().slice(0, 16) + ' ' + (e.message || e) + (e.filename ? ' @' + e.filename.split('/').pop().split('?')[0] + ':' + e.lineno : '')); if (window.__errs.length > 30) window.__errs.shift(); } catch (x) {}

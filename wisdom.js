@@ -223,12 +223,12 @@ var WZ = (function () {
         var mode = (b === 0 && !lastMiss) ? 'm' : ['m', 'f', 'u'].filter(function (x) { return x !== lastMiss; }).sort(function (p, q) { return ways[p] - ways[q] + (Math.random() - .5); })[0];
         var dis = WORDS.filter(function (x) { return x !== w && Math.abs(x[1] - w[1]) <= 1; }).sort(function () { return Math.random() - .5; });
         var opts, prompt, label, correct;
-        if (mode === 'm') { opts = dis.slice(0, 3).concat([w]).sort(function () { return Math.random() - .5; }).map(function (o) { return { t: o[2], ok: o === w }; }); prompt = esc(w[0]); label = 'What does it mean?'; }
+        if (mode === 'm') { opts = dis.slice(0, 3).concat([w]).sort(function () { return Math.random() - .5; }).map(function (o) { return { t: o[2], ok: o === w }; }); prompt = esc(w[0]) + App.sayBtn(w[0]); label = 'What does it mean?'; }
         else if (mode === 'f') { opts = dis.slice(0, 3).concat([w]).sort(function () { return Math.random() - .5; }).map(function (o) { return { t: o[0], ok: o === w }; }); prompt = esc(blank(w)); label = 'Which word fills the gap?'; }
         else {
           var wrong = []; for (var i = 0; i < dis.length && wrong.length < 2; i++) { var mu = misuse(w, dis[i]); if (mu) wrong.push(mu); }
-          if (wrong.length < 2) { mode = 'm'; opts = dis.slice(0, 3).concat([w]).sort(function () { return Math.random() - .5; }).map(function (o) { return { t: o[2], ok: o === w }; }); prompt = esc(w[0]); label = 'What does it mean?'; }
-          else { opts = wrong.map(function (t) { return { t: t, ok: false }; }).concat([{ t: w[3], ok: true }]).sort(function () { return Math.random() - .5; }); prompt = esc(w[0]) + ' <span class="mute small">(' + esc(w[2]) + ')</span>'; label = 'Which sentence uses it correctly?'; }
+          if (wrong.length < 2) { mode = 'm'; opts = dis.slice(0, 3).concat([w]).sort(function () { return Math.random() - .5; }).map(function (o) { return { t: o[2], ok: o === w }; }); prompt = esc(w[0]) + App.sayBtn(w[0]); label = 'What does it mean?'; }
+          else { opts = wrong.map(function (t) { return { t: t, ok: false }; }).concat([{ t: w[3], ok: true }]).sort(function () { return Math.random() - .5; }); prompt = esc(w[0]) + App.sayBtn(w[0]) + ' <span class="mute small">(' + esc(w[2]) + ')</span>'; label = 'Which sentence uses it correctly?'; }
         }
         $('#q', v).innerHTML = '<div class="panel"><span class="eyebrow">' + (n + 1) + ' / ' + total + ' · ' + label + '</span><h2 style="font-size:' + (mode === 'f' ? '17px;font-weight:600;line-height:1.4' : '22px') + '">' + prompt + '</h2><p class="small mute">Box ' + b + ' of 4 · meaning ' + ways.m + ' · fill-in ' + ways.f + ' · usage ' + ways.u + '</p></div><div class="list">' + opts.map(function (o, k) { return '<button class="btn opt" data-k="' + k + '" style="text-align:left;font-weight:500">' + esc(o.t) + '</button>'; }).join('') + App.idkBtn('k') + '</div><div id="fb"></div>';
         var done = false;
@@ -241,7 +241,7 @@ var WZ = (function () {
             if (ok && vs.missMode && vs.missMode[w[0]]) delete vs.missMode[w[0]];
             vs.ways[w[0]] = ways; vs.n++; vs.seen = vs.seen || {}; vs.seen[w[0]] = Date.now(); App.save();
             $$('[data-k]', v).forEach(function (x) { if ((opts[+x.dataset.k] || {}).ok) x.classList.add('right'); else if (x === btn) x.classList.add('wrong'); });
-            $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', '<b>' + esc(w[0]) + '</b>: ' + esc(w[2]) + '<br><span class="mute">“' + esc(w[3]) + '”</span>' + (mode === 'u' && !ok ? '<br><span class="small mute">The other sentences swapped the word into a context where it doesn’t belong. Meaning first, then the company a word keeps.</span>' : '')) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
+            $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', '<b>' + esc(w[0]) + '</b>' + App.sayBtn(w[0]) + '<br>' + esc(w[2]) + '<br><span class="mute">“' + esc(w[3]) + '”</span>' + (mode === 'u' && !ok ? '<br><span class="small mute">The other sentences swapped the word into a context where it doesn’t belong. Meaning first, then the company a word keeps.</span>' : '')) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
             $('#nx').onclick = function () { n++; ask(); };
           };
         });
@@ -275,7 +275,7 @@ var WZ = (function () {
     var vs = vst(); vs.seen = vs.seen || {}; vs.seen[w[0]] = Date.now();
     var dis = WORDS.filter(function (x) { return x !== w && Math.abs(x[1] - w[1]) <= 1; }).sort(function () { return Math.random() - .5; }).slice(0, 2);
     var opts = dis.concat([w]).sort(function () { return Math.random() - .5; });
-    var sheet = App.modal('<div class="grab"></div><span class="eyebrow">Quick recall · 10 seconds</span><h2>' + esc(w[0]) + '</h2><div class="list">' + opts.map(function (o, k) { return '<button class="btn opt" data-r="' + k + '" style="text-align:left">' + esc(o[2]) + '</button>'; }).join('') + App.idkBtn('r') + '</div><div id="rfb"></div>', false);
+    var sheet = App.modal('<div class="grab"></div><span class="eyebrow">Quick recall · 10 seconds</span><h2>' + esc(w[0]) + App.sayBtn(w[0]) + '</h2><div class="list">' + opts.map(function (o, k) { return '<button class="btn opt" data-r="' + k + '" style="text-align:left">' + esc(o[2]) + '</button>'; }).join('') + App.idkBtn('r') + '</div><div id="rfb"></div>', false);
     var over = false;
     $$('[data-r]', sheet).forEach(function (b) {
       b.onclick = function () {
@@ -288,6 +288,11 @@ var WZ = (function () {
       };
     });
   }
+  function report() {
+    var vs = vst(), mm = vs.missMode || {}, n = Object.keys(mm).length;
+    if (n < 3) return [];
+    return [{ sev: Math.min(1, n / 10) * 0.7, text: n + ' Word Duel words you missed last time. Each comes back a different way until you get it.', action: 'Word Duel', go: vocab }];
+  }
   function dueCount() { var vs = vst(), bx = vs.box, seen = vs.seen || {}, now = Date.now(), gaps = [0, 20 * 60e3, 2 * 3600e3, 12 * 3600e3, 2 * 86400e3, 5 * 86400e3]; return WORDS.filter(function (x) { var b = bx[x[0]] || 0; return b >= 1 && now - (seen[x[0]] || 0) >= gaps[Math.min(b, 5)]; }).length; }
-  return { today: function () { return pickQ('home'); }, vst: vst, line: line, card: card, library: library, vocab: vocab, WORDS: WORDS, BOOKS: BOOKS, recallModal: recallModal, recallDue: recallDue, dueCount: dueCount, onlineNudge: onlineNudge, wisdomScreen: wisdomScreen };
+  return { report: report, today: function () { return pickQ('home'); }, vst: vst, line: line, card: card, library: library, vocab: vocab, WORDS: WORDS, BOOKS: BOOKS, recallModal: recallModal, recallDue: recallDue, dueCount: dueCount, onlineNudge: onlineNudge, wisdomScreen: wisdomScreen };
 })();

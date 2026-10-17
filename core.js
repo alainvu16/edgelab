@@ -292,6 +292,25 @@ var App = (function () {
   }
   window.addEventListener('pagehide', function () { clearTimeout(saveT); writeLocal(); if (GH.cfg && Date.now() - GH.last > 20000) ghPush(true); });
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { clearTimeout(saveT); writeLocal(); if (GH.cfg && Date.now() - GH.last > 20000) ghPush(true); if (cloudDoc) { clearTimeout(cloudT); cloudT = null; cloudPush(); } } });
+  // ---------- pronunciation: tap the speaker to hear a word (phone's built-in voice, works offline; silent unless tapped) ----------
+  var canSay = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+  function say(word) {
+    if (!canSay || !word) return;
+    try {
+      speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(String(word).replace(/\s*\/\s*/g, ', '));
+      var vs = speechSynthesis.getVoices().filter(function (x) { return /^en[-_]US/i.test(x.lang); });
+      var best = vs.filter(function (x) { return /samantha|enhanced|premium|natural/i.test(x.name); })[0] || vs[0];
+      if (best) u.voice = best;
+      u.lang = 'en-US'; u.rate = 0.85;
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+  function sayBtn(word) {
+    if (!canSay) return '';
+    return '<button type="button" class="say" data-say="' + esc(word) + '" aria-label="Hear ' + esc(word) + '"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>';
+  }
+  if (typeof document !== 'undefined') document.addEventListener('click', function (e) { var b = e.target && e.target.closest && e.target.closest('[data-say]'); if (b) { e.preventDefault(); e.stopPropagation(); say(b.dataset.say); } }, true);
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   // Missing elements return a detached stand-in, so a callback that finishes after you leave a screen can't crash the app.
   function $(sel, el) { return (el || document).querySelector(sel) || document.createElement('div'); }
@@ -707,8 +726,8 @@ var App = (function () {
         (ss.active ? '' : '<div class="panel"><h3>Start a session</h3><p class="mute small">Set a time box so you train sharp and stop before you burn out.</p><div class="btns">' +
           [15, 30, 45, 60].map(function (m) { return '<button class="btn' + (m === 30 ? ' primary' : '') + '" data-s="' + m + '">' + m + ' min</button>'; }).join('') + '</div></div>') +
         '<div class="panel"><span class="eyebrow">Next up</span><h2>' + sug[1] + ' is your weakest area</h2><p class="mute small">Everything levels up as you get things right, and slows down when you miss.</p><button class="btn primary" id="go">Train ' + sug[1] + '</button></div>' +
+        focusHTML() +
         '<div class="panel"><span class="eyebrow">Today’s 30 minutes</span><div class="list" style="gap:6px">' + dailyPlan().map(function (it, i) { return '<button class="item" data-dp="' + i + '" style="padding:9px 12px"><span class="pill" style="min-width:44px;justify-content:center">' + it.min + 'm</span><span class="grow small">' + it.text + '</span><span class="end">›</span></button>'; }).join('') + '</div></div>' +
-        '<div class="panel"><span class="eyebrow">Coach’s notes</span>' + ['chess', 'xq', 'poker', 'mkt'].map(function (k) { var r = mods[k] && mods[k].report ? mods[k].report()[0] : null; if (!r) return ''; return '<div class="row" style="align-items:flex-start"><span class="pill" style="min-width:64px;justify-content:center">' + { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets' }[k] + '</span><span class="small grow">' + r.text + '</span></div>'; }).join('') + '<p class="small mute">Each area tracks your mistakes by type and feeds you more of what you miss.</p></div>' +
         '<div class="panel"><span class="eyebrow">Hours toward ' + HOUR_GOAL + ' each</span><div class="list" style="gap:6px">' + [['chess', 'Chess'], ['xq', 'Xiangqi'], ['poker', 'Poker'], ['mkt', 'Markets']].map(function (t) { var h = hoursOf(t[0]); return '<div class="row"><span class="small" style="width:70px">' + t[1] + '</span><div class="bar grow"><i style="width:' + Math.min(100, h / HOUR_GOAL * 100) + '%"></i></div><span class="mono small mute" style="width:52px;text-align:right">' + (h < 1 ? Math.round(h * 60) + 'm' : h.toFixed(1) + 'h') + '</span></div>'; }).join('') + '</div><p class="small mute">Counts time you are actively training. Each track holds roughly 25 hours of structured material, and the bots, puzzles and replays keep going after that.</p></div>' +
         '<div class="panel"><span class="eyebrow">Your levels</span><div class="stats">' + levelStats() + '</div></div>' +
         '<div class="row"><button class="btn sm ghost" id="sess">Session &amp; break settings</button><button class="btn sm ghost" id="bk">Backups</button><button class="btn sm ghost" id="reset">Reset progress</button><button class="btn sm ghost" id="fxt">Celebrations: ' + (S.fx === false ? 'off' : 'on') + '</button><span class="small mute" id="cs">' + (cloudStatus === 'ok' ? 'Progress synced to your account' : cloudStatus === 'err' ? 'Saved on this device only' : 'Saved on this device') + '</span></div>' +
@@ -718,6 +737,7 @@ var App = (function () {
       $('#go', v).onclick = function () { tab(sug[0]); };
       $$('[data-go]', v).forEach(function (b) { b.onclick = function () { tab(b.dataset.go); }; });
       $$('[data-dp]', v).forEach(function (b) { b.onclick = function () { planCache[+b.dataset.dp].go(); }; });
+      $$('[data-wk]', v).forEach(function (b) { b.onclick = function () { focusCache[+b.dataset.wk].r.go(); }; });
       $('#sess', v).onclick = sessionSheet; if ($('#rsc', v)) $('#rsc', v).onclick = backupScreen; $('#bk', v).onclick = backupScreen;
       $('#qp', v).onclick = function () { if (QP.active) qpNext(); else quickPlay(); };
       if ($('#path', v)) $('#path', v).onclick = RM.home;
@@ -752,6 +772,33 @@ var App = (function () {
     if (typeof WZ === 'undefined' || !WZ.today) return '';
     var q = WZ.today();
     return '<button class="qod" id="qod" aria-label="Quote of the day, tap for its meaning"><span class="eyebrow">Quote of the day</span><span class="qq">“' + esc(q.q) + '”</span><span class="qm small" id="qodm" hidden>' + esc(q.m) + '</span><span class="qh small">Tap for the meaning</span></button>';
+  }
+  // ---------- where you need work: your 3 weakest spots across everything, from what you've missed ----------
+  // Each area's coach report already ranks its own weak spots (sev 0..1); this ranks them against each other, one per area.
+  var FOCUS_NAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', words: 'Words', duel: 'Word Duel', tb: 'ToneBot' }, focusCache = [];
+  function focusList() {
+    var all = [];
+    function add(k, fn) { var items = []; try { items = fn() || []; } catch (e) {} items.forEach(function (r) { if (r && r.go && r.sev >= 0.2) all.push({ k: k, r: r }); }); }
+    ['chess', 'xq', 'poker', 'mkt'].forEach(function (k) { if (mods[k] && mods[k].report) add(k, mods[k].report); });
+    // Xiangqi's characters note counts what you haven't learned yet, not what you missed: only once you've tried them
+    all = all.filter(function (x) { return !(x.k === 'xq' && x.r.action === 'Characters' && !Object.keys((S.xq || {}).han || {}).length); });
+    if (typeof GL !== 'undefined' && GL.report) add('words', GL.report);
+    if (typeof WZ !== 'undefined' && WZ.report) add('duel', WZ.report);
+    if (typeof TB !== 'undefined' && TB.report) add('tb', TB.report);
+    all.sort(function (a, b) { return b.r.sev - a.r.sev; });
+    var seen = {}, out = [];
+    all.forEach(function (x) { if (!seen[x.k] && out.length < 3) { seen[x.k] = 1; out.push(x); } });
+    return out;
+  }
+  function focusHTML() {
+    focusCache = focusList();
+    return '<div class="panel"><span class="eyebrow">Where you need work</span>' +
+      (focusCache.length
+        ? '<p class="mute small">Your weakest spots right now, from what you’ve missed. Tap one to practice it.</p><div class="list" style="gap:6px">' + focusCache.map(function (x, i) {
+            return '<button class="item" data-wk="' + i + '" style="align-items:flex-start;padding:10px 12px"><span class="pill' + (i === 0 ? ' acc' : '') + '" style="min-width:78px;justify-content:center">' + (i + 1) + ' · ' + FOCUS_NAME[x.k] + '</span><span class="grow"><span class="s" style="display:block;color:var(--fg);font-size:14px">' + x.r.text + '</span><span class="s">' + esc(x.r.action) + ' ›</span></span></button>';
+          }).join('') + '</div>'
+        : '<p class="mute small">Nothing stands out yet. After a few dozen answers, your 3 weakest spots show up here with one tap to practice each.</p>') +
+      '</div>';
   }
   function gamesHTML() {
     var due = 0, tier = 1, mast = 0, th = (S.think || { n: 0, ok: 0 });
@@ -835,7 +882,7 @@ var App = (function () {
 
   return {
     backupScreen: backupScreen, idkBtn: idkBtn, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
-    S: null, save: save, esc: esc, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
+    S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
     st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
   };
