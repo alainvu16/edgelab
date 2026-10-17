@@ -226,7 +226,7 @@ var TB = (function () {
       if (a) {
         var c = botCall(day);
         v.innerHTML = top + '<div class="panel"><span class="eyebrow">Locked ' + new Date(a.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '</span><p><b>' + esc(a.group) + '</b> leads · tape <b>' + esc(a.tape) + '</b> · 10-yr <b>' + esc(a.tnx) + '</b> · idea <b>' + esc(a.idea) + '</b> (' + esc(a.mode) + ')</p>' +
-          '<p class="small">' + (c ? '☀️ <b>ToneBot’s call:</b> ' + esc(c.lead) + ' leads, ' + esc(c.lag) + ' lags' + (c.conf ? ' @ ' + Math.round(c.conf * 100) + '%' : '') : 'ToneBot’s morning call shows here once it syncs (after about 9:30 AM).') + '</p>' +
+          '<p class="small">' + (c ? '☀️ <b>ToneBot’s call:</b> ' + esc(c.lead) + ' leads, ' + esc(c.lag) + ' lags' + (c.conf ? ' @ ' + Math.round(c.conf * 100) + '%' : '') : 'ToneBot’s morning call shows here once it syncs (around 9:40 AM ET).') + '</p>' +
           '<p class="small mute">Graded after the close, once the evening sync lands.</p></div>' + tail;
         wire(); return;
       }
