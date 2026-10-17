@@ -972,5 +972,5 @@ var CZ = (function () {
     return out;
   }
   App.reg('chess', { home: home, place: place, report: report, quick: quick });
-  return { idea: idea, analyse: analyse, threat: threat, ALL: ALL, LESSONS: LESSONS, estElo: estElo, creativePool: creativePool, watchCues: watchCues, puzzles: puzzles, lesson: lesson, lessonDone: lessonDone, lessonOpen: lessonOpen, play: play, playMenu: playMenu, endgame: endgame, endgameMenu: endgameMenu, openings: openings, openingDrill: openingDrill, vision: vision, OPS: OPS, BOTS: BOTS, ENDG: ENDG };
+  return { pieceSVG: pieceSVG, idea: idea, analyse: analyse, threat: threat, ALL: ALL, LESSONS: LESSONS, estElo: estElo, creativePool: creativePool, watchCues: watchCues, puzzles: puzzles, lesson: lesson, lessonDone: lessonDone, lessonOpen: lessonOpen, play: play, playMenu: playMenu, endgame: endgame, endgameMenu: endgameMenu, openings: openings, openingDrill: openingDrill, vision: vision, OPS: OPS, BOTS: BOTS, ENDG: ENDG };
 })();

@@ -294,7 +294,7 @@ var App = (function () {
       '<h3>Market breaks</h3><p class="mute small">A short trading quiz after every stretch of play.</p>' +
       '<div class="seg" id="bev">' + [8, 12, 20, 0].map(function (m) { return '<button aria-pressed="' + (S.breakEvery === m) + '" data-b="' + m + '">' + (m ? 'Every ' + m + ' min' : 'Off') + '</button>'; }).join('') + '</div>' +
       (sampleFn ? '<h3>Explain like I’m 5</h3><div class="seg" id="simps">' + [['off', 'Button only'], ['wrong', 'When I’m wrong'], ['always', 'Always']].map(function (o) { return '<button aria-pressed="' + ((S.simple || 'wrong') === o[0]) + '" data-sm="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><p class="mute small">Rewrites coach notes in kid-simple words using Claude (needs a connection).</p>' : '') +
-      '<h3>Celebrations</h3><div class="seg" id="fxs"><button aria-pressed="' + (S.fx !== false) + '" data-fx="1">On</button><button aria-pressed="' + (S.fx === false) + '" data-fx="0">Off</button></div><p class="mute small">Money rain after wins and level-ups: tumbling bills, spinning gold coins and currency signs. Tap On to preview.</p>' +
+      '<h3>Celebrations</h3><div class="seg" id="fxs"><button aria-pressed="' + (S.fx !== false) + '" data-fx="1">On</button><button aria-pressed="' + (S.fx === false) + '" data-fx="0">Off</button></div><p class="mute small">After wins and level-ups: dollar bills, poker chips, gold chess pieces and xiangqi discs rain down. Tap On to preview.</p>' +
       (ss.active ? '<button class="btn ghost" id="endS">End session now</button>' : '') +
       '<button class="btn ghost" id="cls">Close</button>');
     $$('#modal [data-m]').forEach(function (b) { b.onclick = function () { startSession(+b.dataset.m); closeModal(); }; });
@@ -387,11 +387,12 @@ var App = (function () {
 
   // ---------- celebration: "edge rain" — gold knights, spades, 炮 and green candles ----------
   var rainT = null;
-  // ---------- celebration: money rain (tumbling bills, spinning gold coins, currency signs) ----------
+  // ---------- celebration: tumbling dollar bills, spinning poker chips, gold chess pieces, xiangqi discs ----------
   var sprites = null;
   function makeSprites() {
     var dpr = Math.min(2, window.devicePixelRatio || 1);
     function cnv(w, h, draw) { var c = document.createElement('canvas'); c.width = w * dpr; c.height = h * dpr; var x = c.getContext('2d'); x.scale(dpr, dpr); draw(x, w, h); return { c: c, w: w, h: h }; }
+    // Markets: dollar bills
     function bill(face) {
       return cnv(64, 30, function (x, w, h) {
         var g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#7fc39a'); g.addColorStop(.5, '#a8dcb7'); g.addColorStop(1, '#6fb48b');
@@ -403,21 +404,43 @@ var App = (function () {
         x.font = '800 7px system-ui,sans-serif'; x.fillText(face, 9, 8); x.fillText(face, w - 9, h - 7);
       });
     }
-    function coin(sym) {
-      return cnv(30, 30, function (x, w, h) {
-        var g = x.createRadialGradient(10, 9, 2, 15, 15, 15); g.addColorStop(0, '#fff2bf'); g.addColorStop(.45, '#f0b545'); g.addColorStop(1, '#a8741b');
-        x.fillStyle = g; x.beginPath(); x.arc(15, 15, 14, 0, 6.29); x.fill();
-        x.strokeStyle = '#8a5d12'; x.lineWidth = 1.2; x.beginPath(); x.arc(15, 15, 11, 0, 6.29); x.stroke();
-        x.fillStyle = '#7a520f'; x.font = '800 14px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(sym, 15, 16);
+    // Poker: casino chips with edge stripes and a value
+    function chip(col, edge, val, ink) {
+      return cnv(32, 32, function (x) {
+        x.fillStyle = col; x.beginPath(); x.arc(16, 16, 15, 0, 6.29); x.fill();
+        x.fillStyle = edge; for (var k = 0; k < 6; k++) { x.save(); x.translate(16, 16); x.rotate(k * Math.PI / 3); x.fillRect(-2.6, -15, 5.2, 5); x.restore(); }
+        x.strokeStyle = edge; x.lineWidth = 1.2; x.setLineDash([2.2, 2.2]); x.beginPath(); x.arc(16, 16, 9.5, 0, 6.29); x.stroke(); x.setLineDash([]);
+        x.fillStyle = ink; x.font = '800 9px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(val, 16, 16.5);
       });
     }
-    function sign(sym, col) { return cnv(34, 34, function (x) { x.fillStyle = col; x.font = '800 26px system-ui,sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = 'rgba(0,0,0,.35)'; x.shadowBlur = 4; x.fillText(sym, 17, 18); }); }
-    return {
+    // Xiangqi: round wooden discs with the character
+    function disc(ch, red) {
+      return cnv(32, 32, function (x) {
+        var g = x.createRadialGradient(12, 11, 2, 16, 16, 16); g.addColorStop(0, '#fbeccb'); g.addColorStop(1, '#d9b779');
+        x.fillStyle = g; x.beginPath(); x.arc(16, 16, 15, 0, 6.29); x.fill();
+        x.strokeStyle = '#7a5525'; x.lineWidth = 1.2; x.stroke();
+        x.strokeStyle = red ? '#b3261e' : '#1d1d1d'; x.lineWidth = 1; x.beginPath(); x.arc(16, 16, 12, 0, 6.29); x.stroke();
+        x.fillStyle = red ? '#b3261e' : '#1d1d1d'; x.font = '700 16px "Noto Serif SC","Songti SC","PingFang SC",serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(ch, 16, 17);
+      });
+    }
+    var sp = {
       bills: [bill('100'), bill('50'), bill('20')],
-      coins: [coin('$'), coin('€'), coin('¥'), coin('₿')],
-      signs: [sign('$', '#f0b545'), sign('€', '#fbe29a'), sign('£', '#f0b545'), sign('¥', '#fbe29a'), sign('₿', '#f7a531'), sign('$', '#4cc08a')]
+      chips: [chip('#c73a3a', '#f4efe6', '5', '#fff'), chip('#2f6fd0', '#f4efe6', '10', '#fff'), chip('#1f8a5b', '#f4efe6', '25', '#fff'), chip('#1b1b1f', '#f0b545', '100', '#f0b545'), chip('#7b4bc4', '#f4efe6', '500', '#fff')],
+      discs: [disc('炮', true), disc('帥', true), disc('車', false), disc('馬', false), disc('將', false), disc('兵', true)],
+      pieces: []
     };
+    // Chess: the app's own piece drawings, in gold, loaded as images (they join the rain once ready)
+    try {
+      if (typeof CZ !== 'undefined' && CZ.pieceSVG) ['n', 'q', 'k', 'r', 'b'].forEach(function (t) {
+        var svg = CZ.pieceSVG(t, 'w').replace('<svg ', '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" ').replace(/style="width:84%;height:84%;display:block;overflow:visible"/, '')
+          .replace(/fill="#f8f4ea"/g, 'fill="#f0b545"').replace(/stroke="#2a231d"/g, 'stroke="#6b470c"').replace(/fill="#2a231d"/g, 'fill="#6b470c"');
+        var img = new Image(); img.onload = function () { sp.pieces.push(cnv(34, 34, function (x) { x.drawImage(img, 0, 0, 34, 34); })); };
+        img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+      });
+    } catch (e) {}
+    return sp;
   }
+  setTimeout(function () { try { if (!sprites) sprites = makeSprites(); } catch (e) {} }, 1500);
   function celebrate(kind) {
     if (S.fx === false) return;
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -429,8 +452,9 @@ var App = (function () {
     var ctx = cv.getContext('2d'); ctx.scale(dpr, dpr);
     var big = kind === 'level', N = big ? 80 : 55, P = [];
     for (var i = 0; i < N; i++) {
-      var r = Math.random(), type = r < .45 ? 'bill' : r < .75 ? 'coin' : 'sign';
-      var pool = type === 'bill' ? sprites.bills : type === 'coin' ? sprites.coins : sprites.signs;
+      // one theme per discipline, mixed: bills (markets), chips (poker), gold chess pieces, xiangqi discs
+      var r = Math.random(), type = r < .34 ? 'bill' : r < .62 ? 'chip' : r < .82 && sprites.pieces.length ? 'piece' : 'disc';
+      var pool = type === 'bill' ? sprites.bills : type === 'chip' ? sprites.chips : type === 'piece' ? sprites.pieces : sprites.discs;
       P.push({ t: type, sp: pool[(Math.random() * pool.length) | 0], x: Math.random() * W, y: -40 - Math.random() * H * (big ? 1 : .8),
         v: type === 'bill' ? 1.4 + Math.random() * 1.6 : 2.4 + Math.random() * 2.4, // bills float, coins drop
         rot: Math.random() * 6.28, vr: (Math.random() - .5) * (type === 'bill' ? .05 : .12), ph: Math.random() * 6.28, vp: .06 + Math.random() * .08,
@@ -446,7 +470,7 @@ var App = (function () {
         ctx.save(); ctx.translate(x, p.y); ctx.rotate(p.rot);
         // bills tumble end over end, coins spin edge-on: fake 3D with a squash
         if (p.t === 'bill') ctx.scale(p.sc, p.sc * (0.25 + 0.75 * Math.abs(Math.cos(p.ph))));
-        else if (p.t === 'coin') ctx.scale(p.sc * (0.15 + 0.85 * Math.abs(Math.cos(p.ph * 1.3))), p.sc);
+        else if (p.t === 'chip' || p.t === 'disc') ctx.scale(p.sc * (0.15 + 0.85 * Math.abs(Math.cos(p.ph * 1.3))), p.sc);
         else ctx.scale(p.sc, p.sc);
         ctx.drawImage(sp.c, -sp.w / 2, -sp.h / 2, sp.w, sp.h);
         ctx.restore();
