@@ -1,5 +1,5 @@
 // Engine worker: keeps the UI thread free while bots and the coach think.
-importScripts('chess.js?v=29', 'engine.js?v=29', 'xq-engine.js?v=29');
+importScripts('chess.js?v=30', 'engine.js?v=30', 'xq-engine.js?v=30');
 onmessage = function (e) {
   var m = e.data, res = null;
   try {

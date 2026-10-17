@@ -354,7 +354,7 @@ var App = (function () {
     }
     if (vis && curTab !== 'home' && now - lastTouch < 120000) {
       S.hours = S.hours || {}; S.hours[curTab] = (S.hours[curTab] || 0) + dt;
-      var dk = new Date().toISOString().slice(0, 10); S.dayLog = S.dayLog || {}; if (!S.dayLog[dk]) { S.dayLog[dk] = 1; var dks = Object.keys(S.dayLog).sort(); if (dks.length > 400) delete S.dayLog[dks[0]]; }
+      var dk = dayKey(new Date()); S.dayLog = S.dayLog || {}; if (!S.dayLog[dk]) { S.dayLog[dk] = 1; var dks = Object.keys(S.dayLog).sort(); if (dks.length > 400) delete S.dayLog[dks[0]]; }
       if (Math.floor((S.hours[curTab] - dt) / 60000) !== Math.floor(S.hours[curTab] / 60000)) save();
     }
     tickUI();
@@ -367,8 +367,20 @@ var App = (function () {
     t.textContent = left > 0 ? fmt(left) + ' left' : 'Time’s up';
     t.className = 'timer' + (left < 5 * 60000 ? ' low' : '');
   }
+  // local calendar day (the old UTC key flipped at 8 PM Eastern)
+  function dayKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  // streak = consecutive days with any training, counted from today (or yesterday if you haven't trained yet today)
+  function streak() {
+    var log = S.dayLog || {}, d = new Date(), n = 0;
+    var has = function (x) { var k = dayKey(x), u = x.toISOString().slice(0, 10); return log[k] || log[u]; };
+    if (!has(d)) d = new Date(d.getTime() - 864e5);
+    while (has(d) && n < 999) { n++; d = new Date(d.getTime() - 864e5); }
+    return n;
+  }
+  // a time box belongs to the day it was started: a new day starts fresh
+  function sessionNewDay() { if (S.session && S.session.active && S.session.day !== dayKey(new Date())) { S.session.active = false; S.session.used = 0; save(); } }
   function startSession(min) {
-    S.session = { limit: min, active: true, used: 0, sinceBreak: 0, extended: false };
+    S.session = { limit: min, active: true, used: 0, sinceBreak: 0, extended: false, day: dayKey(new Date()) };
     var today = new Date().toDateString();
     if (S.lastDay !== today) {
       var y = new Date(Date.now() - 864e5).toDateString();
@@ -738,9 +750,9 @@ var App = (function () {
     var m = S.mkt || {}, today = m.today || 0, goal = m.goal || 15, hrs = 0; try { hrs = App.totalHours(); } catch (e) {}
     var elo = '—'; try { elo = CZ.estElo().elo; } catch (e) {}
     var xel = 'Lv ' + ((S.xq && S.xq.level) || 1); try { if (XQ.estElo) xel = XQ.estElo().elo; } catch (e) {}
-    var streak = S.streakDays > 1 ? '<span class="hchip">' + S.streakDays + '-day streak</span>' : '<span class="hchip">Day one</span>';
+    var sk = streak(), streakChip = '<span class="hchip">' + (sk >= 2 ? sk + '-day streak' : 'Day one') + '</span>';
     return '<section class="hero">' +
-      '<div class="hrow"><span class="eyebrow">' + greet + ', Alain</span>' + streak + '</div>' +
+      '<div class="hrow"><span class="eyebrow">' + greet + ', Alain</span>' + streakChip + '</div>' +
       '<h1 class="htitle">Train your <span>edge</span>.</h1>' +
       '<p class="hsub mono">' + (today >= goal ? Math.min(today, 999) + ' questions · goal hit · ' : today + '/' + goal + ' questions today · ') + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
       '<div class="dials">' +
@@ -795,6 +807,7 @@ var App = (function () {
     setInterval(tick, 1000);
     setInterval(function () { if (cloudDoc) cloudPush(); }, 60000);
     setTimeout(ghCheckOnOpen, 2500);
+    sessionNewDay(); setInterval(sessionNewDay, 60000);
     document.addEventListener('visibilitychange', function () { lastTick = Date.now(); });
     var h = (location.hash || '').slice(1);
     tab(mods[h] ? h : 'home');
