@@ -34,13 +34,12 @@ var TB = (function () {
       v.innerHTML = '<div class="tb-home"><span class="eyebrow">Learn the bot you built</span><h1>ToneBot School</h1><p class="mute small">Your momentum + sector-rotation strategy, taught from ToneBot’s own lab results. Every lesson says how proven it is. ' + n + ' of ' + L.length + ' lessons done.</p></div>' +
         botPanel(T, s) +
         '<button class="item" id="mc" style="border-color:var(--accent)"><span class="grow"><span class="t">☀️ Daily drill: you vs ToneBot</span><br><span class="s">' + esc(drillStatus()) + ' · ' + esc(recShort()) + '</span></span><span class="end">›</span></button>' +
-        (C && C.quiz && C.quiz.length ? '<button class="item" id="cqz"><span class="grow"><span class="t">🧠 Course quiz</span><br><span class="s">' + Math.round((courseProgress() || 0) * 100) + '% of ' + C.quiz.length + ' questions learned · in course order · misses come back as a second look</span></span><span class="end">›</span></button>' : '') +
-        '<div class="btns"><button class="btn" id="rr">Rotation Replay: you vs the bot</button></div>' +
-        (C && C.blocks ? '<button class="item" id="lc"><span class="grow"><span class="t">📚 Learn course</span><br><span class="s">The bot’s full course · ' + courseTracks().length + ' tracks · ' + C.blocks.filter(function (b) { return b[0] === 'h3'; }).length + ' lessons · tagged 📘 / 🧪 / ✅</span></span><span class="end">›</span></button>' : '') +
+                '<div class="btns"><button class="btn" id="rr">Rotation Replay: you vs the bot</button></div>' +
+        (hasCourse() ? '<button class="item" id="lc" style="border-color:var(--accent)"><span class="grow"><span class="t">📚 ToneBot course</span><br><span class="s">Read a lesson, then quiz it · ' + courseLessons().filter(lessonDone).length + ' of ' + courseLessons().length + ' lessons done · in order</span></span><span class="end">›</span></button>' : '') +
         '<h2>Lessons</h2><div class="list">' + L.map(function (l, i) { var tg = TAGS[l.tag]; return '<button class="item" data-l="' + i + '"><span class="grow"><span class="t">' + esc(l.t) + '</span><br><span class="s">' + tg[1] + '</span></span><span class="end">' + (s.done[l.id] ? '✓' : '›') + '</span></button>'; }).join('') + '</div>' +
         '<p class="small mute">Learning only. Nothing here changes what ToneBot trades. Market questions are for learning, not investment advice.</p>';
       $$('[data-l]', v).forEach(function (b) { b.onclick = function () { lesson(+b.dataset.l); }; });
-      $('#rr', v).onclick = replay; $('#mc', v).onclick = drill; if ($('#lc', v)) $('#lc', v).onclick = course; if ($('#cqz', v)) $('#cqz', v).onclick = function () { courseQuiz(''); };
+      $('#rr', v).onclick = replay; $('#mc', v).onclick = drill; if ($('#lc', v)) $('#lc', v).onclick = course;
     });
   }
   function pct(x) { return x == null ? '—' : (x >= 0 ? '+' : '') + (x * 100).toFixed(1) + '%'; }
@@ -138,77 +137,90 @@ var TB = (function () {
   }
 
 
-  // ---------- LEARN COURSE (Oct 17): the bot's full course, the same text the Google Doc had, read from tonebot-course.json ----------
+  // ---------- TONEBOT COURSE (Oct 17): the bot's full course as one learning course — read a lesson, then quiz it ----------
+  // Data: tonebot-course.json (blocks = the course text in order, quiz = 294 multiple-choice questions with a 'why' per choice).
+  // Order = the course's own order (track → level → lesson). A missed question comes back as a true/false "second look",
+  // then once more as the full question; a lesson is done when all its questions are learned.
+  function splitT(x) { var m = String(x || '').match(/^(.*?)\s—\s((?:📘|🧪|✅|🔒).*)$/u); return m ? [m[1], m[2]] : [String(x || ''), '']; }
   function courseTracks() {
     var out = [], cur = null;
     ((C && C.blocks) || []).forEach(function (b) { if (b[0] === 'h1') { cur = { t: b[1], b: [] }; out.push(cur); } else if (cur) cur.b.push(b); });
     return out;
   }
-  function course() {
-    App.screen('Learn course', function (v) {
-      var tr = courseTracks();
-      v.innerHTML = '<div><span class="eyebrow">ToneBot · updated ' + esc((C && C.updated) || '') + '</span><h1>Learn course</h1><p class="mute small">📘 general knowledge · 🧪 UNTESTED: how the bot trades, not proven to win · ✅ PROVEN: passed the bot’s tests.</p></div>' +
-        '<div class="list">' + tr.map(function (t, i) { var n = t.b.filter(function (b) { return b[0] === 'h3'; }).length; return '<button class="item" data-t="' + i + '"><span class="grow"><span class="t">' + esc(splitT(t.t)[0]) + '</span><br><span class="s">' + esc(splitT(t.t)[1]) + ' · ' + (n ? n + (n === 1 ? ' lesson' : ' lessons') : t.b.length + ' entries') + '</span></span><span class="end">›</span></button>'; }).join('') + '</div>' +
-        '<p class="small mute">Learning only, not advice for real money.</p>';
-      $$('[data-t]', v).forEach(function (b) { b.onclick = function () { track(tr[+b.dataset.t]); }; });
+  var LS_CACHE = null;
+  function courseLessons() {
+    if (LS_CACHE && LS_CACHE.c === C) return LS_CACHE.l;
+    var out = [], tr = '', tag = '', lv = '', cur = null;
+    ((C && C.blocks) || []).forEach(function (b) {
+      if (b[0] === 'h1') { var x = splitT(b[1]); tr = x[0]; tag = x[1]; cur = null; }
+      else if (b[0] === 'h2') { lv = b[1]; cur = null; }
+      else if (b[0] === 'h3') { cur = { i: out.length, track: tr, tag: tag, level: lv, title: b[1], body: [] }; out.push(cur); }
+      else if (cur && b[0] === 'p') cur.body.push(b[1]);
     });
-  }
-  function splitT(x) { var m = x.match(/^(.*?)\s—\s((?:📘|🧪|✅|🔒).*)$/u); return m ? [m[1], m[2]] : [x, '']; }
-  function track(t) {
-    var nm = splitT(t.t);
-    App.screen(nm[0].split(' — ')[0], function (v) {
-      var h = '', open = false, lvl = false;
-      function close() { if (open) { h += '</details>'; open = false; } }
-      t.b.forEach(function (b) {
-        var st = b[0], x = esc(b[1]);
-        if (st === 'h2') { close(); h += '<details class="panel" style="padding:12px 14px"><summary style="cursor:pointer"><b>' + x + '</b></summary>'; open = true; lvl = true; }
-        else if (st === 'h3') h += '<h3 style="margin:14px 0 4px">' + x + '</h3>';
-        else if (st === 'q') h += '<p class="small" style="margin:8px 0 2px"><b>' + x + '</b></p>';
-        else if (st === 'a') h += '<details class="small" style="margin:0 0 6px"><summary class="mute" style="cursor:pointer">Show answer</summary><p class="small">' + x + '</p></details>';
-        else h += '<p class="small" style="overflow-wrap:anywhere">' + x + '</p>';
-      });
-      close();
-      v.innerHTML = '<div><span class="eyebrow">Learn course</span><h1>' + esc(nm[0]) + '</h1><p class="mute small">' + esc(nm[1]) + '</p></div>' + (lvl ? '' : '<div class="panel">') + h + (lvl ? '' : '</div>');
-    });
-  }
-
-
-  // ---------- COURSE QUIZ (Oct 17): the bot's 294 course questions, in course order, mixed into the learning path ----------
-  // Order = the course's own order (track → level → lesson). A miss comes back later as a true/false "second look",
-  // then once more as the full question; only then it counts as learned.
-  function cqState() { var s = st(); s.cq = s.cq || {}; return s.cq; }
-  function quizOf(trackStart) { return ((C && C.quiz) || []).filter(function (q) { return !trackStart || q.track.indexOf(trackStart) === 0; }); }
-  function courseProgress(trackStart) { var qs = quizOf(trackStart); if (!qs.length) return null; var cq = cqState(); return qs.filter(function (q) { return (cq[q.id] || {}).s === 'ok'; }).length / qs.length; }
-  function pickBlock(trackStart, n) {
-    var qs = quizOf(trackStart), cq = cqState(), out = [];
-    qs.forEach(function (q) { if ((cq[q.id] || {}).s === 'tf' && out.length < 2) out.push({ q: q, tf: true }); });
-    qs.forEach(function (q) { if ((cq[q.id] || {}).s === 'mc2' && out.length < 3) out.push({ q: q }); });
-    qs.forEach(function (q) { if (!cq[q.id] && out.length < n) out.push({ q: q }); });
-    if (!out.length) qs.slice().sort(function () { return Math.random() - .5; }).slice(0, n).forEach(function (q) { out.push({ q: q, review: true }); });
+    var qs = (C && C.quiz) || [];
+    out.forEach(function (l) { l.qs = qs.filter(function (q) { return q.track === l.track && q.lesson === l.title; }); });
+    LS_CACHE = { c: C, l: out };
     return out;
   }
-  function courseQuiz(trackStart, onDone) {
+  function cqState() { var s = st(); s.cq = s.cq || {}; s.cl = s.cl || {}; return s.cq; }
+  function lessonKey(l) { return l.track + ' · ' + l.title; }
+  function lessonDone(l) { var cq = cqState(); return l.qs.length ? l.qs.every(function (q) { return (cq[q.id] || {}).s === 'ok'; }) : !!st().cl[lessonKey(l)]; }
+  function lessonsOf(start) { return courseLessons().filter(function (l) { return !start || l.track.indexOf(start) === 0; }); }
+  function lessonSeen(l) { var cq = cqState(); return l.qs.length ? l.qs.every(function (q) { return !!cq[q.id]; }) : !!st().cl[lessonKey(l)]; }
+  function courseProgress(start) { var ls = lessonsOf(start); if (!ls.length) return null; return ls.filter(lessonDone).length / ls.length; }
+  function hasCourse() { return !!(C && C.blocks && C.blocks.length && C.quiz && C.quiz.length); }
+  function courseNext(start) {
+    if (!hasCourse()) { App.screen('ToneBot course', function (v) { v.innerHTML = '<div class="panel"><p>The course downloads from your private backup the next time the app is online.</p></div>'; refresh(); }); return; }
+    var ls = lessonsOf(start), l = ls.filter(function (x) { return !lessonSeen(x); })[0];   // next lesson you haven't tried yet, in order
+    if (l) { playLesson(l, start); return; }
+    var due = dueSecondLooks().filter(function (q) { return !start || q.track.indexOf(start) === 0; });
+    if (due.length) runQuiz(due.slice(0, 6).map(function (q) { return { q: q, tf: (cqState()[q.id] || {}).s === 'tf' }; }), 'Second look', function () { courseNext(start); });
+    else courseReview(start);
+  }
+  // one lesson: read it, then answer its questions
+  function playLesson(l, start) {
+    App.screen('ToneBot course', function (v) {
+      var all = lessonsOf(start), pos = all.indexOf(l) + 1;
+      v.innerHTML = '<div><span class="eyebrow">' + esc(l.track) + ' · ' + esc(l.level) + '</span><h1>' + esc(l.title) + '</h1><p class="mute small">' + esc(l.tag) + (all.length ? ' · lesson ' + pos + ' of ' + all.length : '') + '</p></div>' +
+        '<div class="panel">' + l.body.map(function (p) { var k = p.indexOf(': '); return k > 0 && k < 60 ? '<p class="small"><b>' + esc(p.slice(0, k)) + '.</b> ' + esc(p.slice(k + 2)) + '</p>' : '<p class="small">' + esc(p) + '</p>'; }).join('') + '</div>' +
+        '<button class="btn primary" id="qz" style="width:100%">' + (l.qs.length ? 'Quiz me: ' + l.qs.length + ' question' + (l.qs.length > 1 ? 's' : '') : 'Got it — next lesson') + '</button>' +
+        '<p class="small mute">Learning only, not advice for real money.</p>';
+      $('#qz', v).onclick = function () {
+        if (!l.qs.length) { st().cl[lessonKey(l)] = 1; App.save(); App.checkpoint(function () { App.back(); courseNext(start); }); return; }
+        App.back(); runQuiz(lessonItems(l), l.title, function () { courseNext(start); });
+      };
+    });
+  }
+  function lessonItems(l) {
+    var cq = cqState();
+    return l.qs.filter(function (q) { return (cq[q.id] || {}).s !== 'ok'; }).map(function (q) { return { q: q, tf: (cq[q.id] || {}).s === 'tf' }; });
+  }
+  // everything learned in this part: a mixed review of 6 random questions
+  function courseReview(start) {
+    var qs = []; lessonsOf(start).forEach(function (l) { qs = qs.concat(l.qs); });
+    runQuiz(qs.sort(function () { return Math.random() - .5; }).slice(0, 6).map(function (q) { return { q: q, review: true }; }), 'Review', function () { courseNext(start); });
+  }
+  function runQuiz(items, title, next) {
     App.screen('Course quiz', function (v) {
-      if (!quizOf().length) { v.innerHTML = '<div class="panel"><p>The course questions download from your private backup the next time the app is online.</p></div>'; refresh(); return; }
-      var items = pickBlock(trackStart, 6), i = 0, right = 0, cq = cqState();
+      var i = 0, right = 0, cq = cqState();
       function ask() {
         if (i >= items.length) {
           App.save();
-          v.innerHTML = App.coachHTML('info', right + ' of ' + items.length + ' right. ' + (trackStart ? Math.round((courseProgress(trackStart) || 0) * 100) + '% of “' + esc(trackStart) + '” learned.' : '')) +
-            '<div class="btns"><button class="btn primary" id="more">Next questions</button><button class="btn" id="dn">Done</button></div>';
-          $('#more', v).onclick = function () { App.checkpoint(function () { App.back(); courseQuiz(trackStart, onDone); }); };
-          $('#dn', v).onclick = function () { App.checkpoint(function () { App.back(); if (onDone) onDone(); }); };
+          v.innerHTML = App.coachHTML('info', right + ' of ' + items.length + ' right on “' + esc(title) + '”.' + (right < items.length ? ' The ones you missed come back later as a second look.' : '')) +
+            '<div class="btns"><button class="btn primary" id="more">Next lesson</button><button class="btn" id="dn">Done</button></div>';
+          $('#more', v).onclick = function () { App.checkpoint(function () { App.back(); next(); }); };
+          $('#dn', v).onclick = function () { App.checkpoint(App.back); };
           return;
         }
-        var it = items[i], q = it.q, rec = cq[q.id] || {}, head = '<span class="eyebrow">' + esc(q.track) + ' · ' + esc(q.lesson) + '</span><p class="small mute" style="margin:2px 0 8px">' + esc(q.tag || '') + (it.tf ? ' · Second look' : it.review ? ' · Review' : '') + '</p>';
-        var done = false, opts, okK;
+        var it = items[i], q = it.q, rec = cq[q.id] || {}, done = false, okK;
+        var head = '<span class="eyebrow">' + esc(q.track) + ' · ' + esc(q.lesson) + '</span><p class="small mute" style="margin:2px 0 8px">' + esc(q.tag || '') + (it.tf ? ' · Second look' : it.review ? ' · Review' : '') + '</p>';
         if (it.tf) {
-          var showRight = Math.random() < 0.5, wrongs = q.c.map(function (_, k) { return k; }).filter(function (k) { return k !== q.ok; });
+          var wrongs = q.c.map(function (_, k) { return k; }).filter(function (k) { return k !== q.ok; }), showRight = Math.random() < 0.5;
           var shown = showRight ? q.ok : wrongs[Math.floor(Math.random() * wrongs.length)];
           v.innerHTML = head + '<p><b>True or false?</b> ' + esc(q.q) + '</p><p class="panel" style="padding:10px 12px;margin:0 0 10px">Answer: <b>' + esc(q.c[shown]) + '</b></p><div class="list"><button class="btn opt" data-k="1">True</button><button class="btn opt" data-k="0">False</button>' + App.idkBtn('k') + '</div><div id="fb"></div>';
           okK = showRight ? 1 : 0;
         } else {
-          opts = q.c.map(function (_, k) { return k; }).sort(function () { return Math.random() - .5; });
+          var opts = q.c.map(function (_, k) { return k; }).sort(function () { return Math.random() - .5; });
           v.innerHTML = head + '<p><b>' + (i + 1) + '/' + items.length + '.</b> ' + esc(q.q) + '</p><div class="list">' + opts.map(function (k) { return '<button class="btn opt" data-k="' + k + '">' + esc(q.c[k]) + '</button>'; }).join('') + App.idkBtn('k') + '</div><div id="fb"></div>';
           okK = q.ok;
         }
@@ -219,8 +231,7 @@ var TB = (function () {
             $$('[data-k]', v).forEach(function (x) { if (+x.dataset.k === okK) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
             if (ok) right++;
             rec.n = (rec.n || 0) + 1;
-            rec.s = ok ? (it.tf ? 'mc2' : 'ok') : 'tf';
-            if (it.review && ok) rec.s = 'ok';
+            rec.s = it.review ? (ok ? 'ok' : 'tf') : ok ? (it.tf ? 'mc2' : 'ok') : 'tf';
             cq[q.id] = rec;
             var why = !ok && !it.tf && k >= 0 && q.cw[k] ? q.cw[k] + ' ' : '';
             $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', esc(why + (it.tf && !ok ? 'Right answer: ' + q.c[q.ok] + '. ' : '') + q.why)) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
@@ -229,7 +240,46 @@ var TB = (function () {
           };
         });
       }
+      if (!items.length) { next(); return; }
       ask();
+    });
+  }
+  // second looks are due across the whole course: serve them before the next new lesson
+  function dueSecondLooks() { var cq = cqState(); return ((C && C.quiz) || []).filter(function (q) { var s = (cq[q.id] || {}).s; return s === 'tf' || s === 'mc2'; }); }
+  function courseContinue(start) {
+    var due = dueSecondLooks().filter(function (q) { return !start || q.track.indexOf(start) === 0; });
+    if (due.length >= 3) runQuiz(due.slice(0, 4).map(function (q) { return { q: q, tf: (cqState()[q.id] || {}).s === 'tf' }; }), 'Second look', function () { courseNext(start); });
+    else courseNext(start);
+  }
+  // the course map: tracks → lessons (tap one to read + quiz it)
+  function course() {
+    App.screen('ToneBot course', function (v) {
+      var tr = courseTracks(), ls = courseLessons(), done = ls.filter(lessonDone).length;
+      v.innerHTML = '<div><span class="eyebrow">ToneBot · updated ' + esc((C && C.updated) || '') + '</span><h1>ToneBot course</h1><p class="mute small">Read a lesson, then answer its questions. 📘 general knowledge · 🧪 UNTESTED: how the bot trades, not proven to win · ✅ PROVEN: passed the bot’s tests.</p></div>' +
+        (ls.length ? '<button class="btn primary" id="cont" style="width:100%">' + (ls.filter(lessonSeen).length ? 'Continue · ' + ls.filter(lessonSeen).length + ' of ' + ls.length + ' lessons read · ' + done + ' fully learned' : 'Start lesson 1 of ' + ls.length) + '</button>' : '') +
+        '<div class="list">' + tr.map(function (t, i) { var nm = splitT(t.t), mine = ls.filter(function (l) { return l.track === nm[0]; }), d = mine.filter(lessonDone).length; return '<button class="item" data-t="' + i + '"><span class="grow"><span class="t">' + esc(nm[0]) + '</span><br><span class="s">' + esc(nm[1]) + ' · ' + (mine.length ? d + ' of ' + mine.length + ' lessons' : t.b.length + ' entries') + '</span></span><span class="end">›</span></button>'; }).join('') + '</div>' +
+        '<p class="small mute">Learning only, not advice for real money.</p>';
+      if ($('#cont', v)) $('#cont', v).onclick = function () { courseContinue(''); };
+      $$('[data-t]', v).forEach(function (b) { b.onclick = function () { track(tr[+b.dataset.t]); }; });
+    });
+  }
+  function track(t) {
+    var nm = splitT(t.t), ls = courseLessons().filter(function (l) { return l.track === nm[0]; });
+    App.screen(nm[0].split(' — ')[0], function (v) {
+      var h = '<div><span class="eyebrow">ToneBot course</span><h1>' + esc(nm[0]) + '</h1><p class="mute small">' + esc(nm[1]) + '</p></div>';
+      if (!ls.length) {   // the glossary: plain reading
+        h += '<div class="panel">' + t.b.map(function (b) { return '<p class="small" style="overflow-wrap:anywhere">' + esc(b[1]) + '</p>'; }).join('') + '</div>';
+      } else {
+        var lv = null;
+        ls.forEach(function (l) {
+          if (l.level !== lv) { if (lv !== null) h += '</div>'; lv = l.level; h += '<h3 style="margin:14px 0 6px">' + esc(lv) + '</h3><div class="list">'; }
+          var d = lessonDone(l);
+          h += '<button class="item' + (d ? ' done' : '') + '" data-l="' + l.i + '"><span class="grow"><span class="t">' + esc(l.title) + '</span><br><span class="s">' + (l.qs.length ? l.qs.length + ' question' + (l.qs.length > 1 ? 's' : '') : 'reading') + '</span></span><span class="end">' + (d ? '✓' : '›') + '</span></button>';
+        });
+        h += '</div>';
+      }
+      v.innerHTML = h;
+      $$('[data-l]', v).forEach(function (b) { b.onclick = function () { playLesson(courseLessons()[+b.dataset.l], nm[0]); }; });
     });
   }
 
@@ -378,5 +428,5 @@ var TB = (function () {
   function recShort() { var r = record(graded()); return r.n ? r.avg + '/100 avg over ' + r.n + ' days' : 'no graded days yet'; }
   function drillStatus() { var day = drillDay(); return ds()[day] ? 'Drill locked for ' + nice(day) : (windowOpen() ? 'Drill open until 9:25 AM ET' : 'Next drill: ' + nice(day)); }
 
-  return { home: home, course: course, courseQuiz: courseQuiz, courseProgress: courseProgress, hasQuiz: function () { return !!(C && C.quiz && C.quiz.length); }, lessonsDone: function () { return L.length ? L.filter(function (l) { return st().done[l.id]; }).length / L.length : null; }, nextLesson: function () { var i = L.findIndex(function (l) { return !st().done[l.id]; }); if (i >= 0) lesson(i); }, lesson: lesson, replay: replay, myCall: drill, drill: drill, drillStatus: drillStatus, refresh: refresh, count: function () { return L.length; }, done: function () { return L.filter(function (l) { return st().done[l.id]; }).length; } };
+  return { home: home, course: course, courseContinue: courseContinue, courseProgress: courseProgress, hasQuiz: hasCourse, lessonsDone: function () { return L.length ? L.filter(function (l) { return st().done[l.id]; }).length / L.length : null; }, nextLesson: function () { var i = L.findIndex(function (l) { return !st().done[l.id]; }); if (i >= 0) lesson(i); }, lesson: lesson, replay: replay, myCall: drill, drill: drill, drillStatus: drillStatus, refresh: refresh, count: function () { return L.length; }, done: function () { return L.filter(function (l) { return st().done[l.id]; }).length; } };
 })();

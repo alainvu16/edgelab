@@ -7,7 +7,7 @@ var RM = (function () {
   function cnt(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }).length; }
   function frac(v, goal) { return Math.max(0, Math.min(1, (v || 0) / goal)); }
   // ToneBot course steps (Oct 17): the bot's own course questions, placed where they fit the order you learn in. No data yet = not a blocker.
-  function tbStep(label, start, why) { return { label: label, why: why, p: function () { if (typeof TB === 'undefined' || !TB.hasQuiz()) return 1; var x = TB.courseProgress(start); return x == null ? 1 : x; }, go: function () { TB.courseQuiz(start); } }; }
+  function tbStep(label, start, why) { return { label: label, why: why, p: function () { if (typeof TB === 'undefined' || !TB.hasQuiz()) return 1; var x = TB.courseProgress(start); return x == null ? 1 : x; }, go: function () { TB.courseContinue(start); } }; }
   function tbSchool() { return { label: 'ToneBot School: all 11 lessons', why: 'The bot you built, from its own lab results.', p: function () { var x = typeof TB !== 'undefined' ? TB.lessonsDone() : null; return x == null ? 1 : x; }, go: function () { TB.nextLesson(); } }; }
   function selfStep(id, label, why) { return { id: id, label: label, why: why, self: true, p: function () { return rm().self[id] ? 1 : 0; } }; }
 
