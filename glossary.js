@@ -161,7 +161,7 @@ var GL = (function () {
         if (i == null) continue;
         if (CAPS[key] && word !== CAPS[key]) continue;
         var t = T[i];
-        if (COMMON[key] && t[2].indexOf(area) < 0) continue;   // e.g. "value" only on poker screens
+        if (COMMON[key] && (!area || t[2].indexOf(area) < 0)) continue;   // e.g. "value" only on poker screens; never on Home
         if (seen[i]) continue; seen[i] = 1;                     // underline each term once per screen
         var start = m.index + m[1].length;
         out.push(document.createTextNode(text.slice(last, start)));
