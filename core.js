@@ -359,9 +359,10 @@ var App = (function () {
     var h = $('#top');
     h.innerHTML = (canBack ? '<button class="back" aria-label="Back" id="bk">‹</button><div class="crumb">' + esc(title) + '</div>'
       : '<div class="brand">Edge<b>Lab</b></div><div class="crumb"></div>') +
-      (QP.active ? '<button class="timer" id="qpn" style="color:var(--accent);border-color:var(--accent)" aria-label="Skip to next quick play block">Quick ⟳</button>' : '') +
-      '<button class="timer" id="tm" aria-label="Session timer"></button>';
+      (QP.active ? '<button class="timer" id="qpn" style="color:var(--accent);border-color:var(--accent)" aria-label="Skip to next quick play block">Skip ⟳</button><button class="timer" id="qpx" aria-label="Stop quick play">Stop ■</button>' : '') +
+      (QP.active && !S.session.active ? '' : '<button class="timer" id="tm" aria-label="Session timer"></button>');
     if (QP.active) $('#qpn').onclick = function () { var a = qpPick(); var sheet = modal('<div class="grab"></div><span class="eyebrow">Quick play</span><h2>Skip to: ' + qname(a.k) + '</h2><p><b>' + esc(a.label) + '</b></p><div class="btns"><button class="btn primary" id="qgo">Go</button><button class="btn" id="qx">Stay</button></div><button class="btn ghost" id="qstop">Stop quick play</button>'); $('#qgo', sheet).onclick = function () { qpLaunch(a); }; $('#qx', sheet).onclick = closeModal; $('#qstop', sheet).onclick = qpStop; };
+    if (QP.active) $('#qpx').onclick = qpStop;
     if (canBack) $('#bk').onclick = back;
     $('#tm').onclick = sessionSheet;
     tickUI();
@@ -506,7 +507,7 @@ var App = (function () {
     qpLaunch(qpPick());
   }
   function qpNext() { qpLaunch(qpPick()); }
-  function qpStop() { QP.active = false; S.qpOn = 0; save(); closeModal(); toast('Quick play stopped'); header(stack.length ? stack[stack.length - 1].title : 'Home', stack.length > 1); }
+  function qpStop() { QP.active = false; FADE.run = 0; S.qpOn = 0; save(); closeModal(); toast('Quick play stopped'); header(stack.length ? stack[stack.length - 1].title : 'Home', stack.length > 1); }
   var QP_WAIT = 4000; // ms before the next block starts by itself
   function qpBlockDone(done, left) {
     var a = qpPick();
@@ -641,16 +642,35 @@ var App = (function () {
   // Oct 17: the Home counter counts every graded answer in every game (it used to count only Markets quiz questions)
   var tallyAt = 0;
   function tally() {
-    if (!S || Date.now() - tallyAt < 400) return; tallyAt = Date.now();
+    if (!S || Date.now() - tallyAt < 400) return false; tallyAt = Date.now();
     var dk = dayKey(new Date()); if (!S.daily || S.daily.d !== dk) S.daily = { d: dk, n: 0 };
-    S.daily.n++; save();
+    S.daily.n++; save(); return true;
   }
+  // Quick play runs until you stop it, so the app watches for fading focus: 3 real misses in a row
+  // ("I don't know" doesn't count; new material is allowed to be hard). After one offer, quiet for 10 answers.
+  var FADE = { run: 0, quiet: 0 }, FADE_RUN = 3, FADE_QUIET = 10;
+  function fadeNote(grade) {
+    if (!QP.active) { FADE.run = 0; return ''; }
+    if (FADE.quiet > 0) FADE.quiet--;
+    var idk = Date.now() - idkAt < 800;  // this answer was an "I don't know" tap
+    if ({ wrong: 1, mistake: 1, blunder: 1 }[grade] && !idk) FADE.run++;
+    else if ({ right: 1, best: 1, great: 1, good: 1 }[grade]) FADE.run = 0;
+    if (FADE.run < FADE_RUN || FADE.quiet > 0) return '';
+    FADE.run = 0; FADE.quiet = FADE_QUIET;
+    return '<div class="qpfade"><p class="small"><b>' + FADE_RUN + ' misses in a row.</b> That is often tired focus, not the material. A short break now helps it stick.</p><div class="btns"><button class="btn sm primary" type="button" data-qpt="stop">Take a break</button><button class="btn sm" type="button" data-qpt="go">Keep going</button></div></div>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('[data-qpt]'); if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var box = b.closest('.qpfade');
+    if (b.dataset.qpt === 'stop') { qpStop(); tab('home'); } else if (box) box.remove();
+  }, true);
   function answersToday() { return S && S.daily && S.daily.d === dayKey(new Date()) ? S.daily.n : 0; }
   function coachHTML(grade, text, extra) {
-    if (grade && grade !== 'info') tally();
+    var fade = (grade && grade !== 'info' && tally()) ? fadeNote(grade) : '';
     var g = GRADES[grade] || GRADES.info;
     if (grade === 'wrong' && Date.now() - idkAt < 1500) g = ['ok', 'Here’s how it works'];
-    return '<div class="coach ' + g[0] + '" data-g="' + grade + '"><div class="h"><span class="pill ' + g[0] + '">' + g[1] + '</span>' + (extra || '') + '</div><p>' + text + '</p>' + (grade !== 'info' ? '<button class="btn sm ghost simp" type="button">Explain it simpler</button><div class="simpout small" hidden></div>' : '') + '</div>';
+    return '<div class="coach ' + g[0] + '" data-g="' + grade + '"><div class="h"><span class="pill ' + g[0] + '">' + g[1] + '</span>' + (extra || '') + '</div><p>' + text + '</p>' + (grade !== 'info' ? '<button class="btn sm ghost simp" type="button">Explain it simpler</button><div class="simpout small" hidden></div>' : '') + fade + '</div>';
   }
 
   // ---------- "explain like I'm 5": rewrite any coach note in kid-simple words ----------
