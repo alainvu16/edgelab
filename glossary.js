@@ -132,8 +132,133 @@ var GL = (function () {
     ['Flying general', ['flying general'], 'Xiangqi', 'The rule that the two generals may never face each other on an open file.', ''],
     ['Horse leg', ['horse leg', 'hobbling', 'blocked leg'], 'Xiangqi', 'The point next to a horse. If a piece sits there, the horse can\'t jump that way.', '']
   ];
+  // ---- everyday: sophisticated words for daily life (GMAT-style). Appended last so saved progress indices never shift.
+  // Taught in the drill only; never auto-underlined, because many (optimal, deliberate, caveat) also appear in plain app text.
+  var EVERYDAY = [
+    ["Alleviate", "To make a pain or problem less severe", "A short walk after lunch helps alleviate the afternoon slump."],
+    ["Bolster", "To support or strengthen something", "Two strong recommendation letters will bolster the application."],
+    ["Discern", "To notice or understand something that is not obvious", "It took weeks to discern which coworkers actually made the decisions."],
+    ["Facilitate", "To make a process easier or help it happen", "A clear agenda will facilitate a shorter meeting."],
+    ["Impeccable", "Without a single flaw", "Her timing was impeccable; she asked for the raise right after the big win."],
+    ["Inherent", "Built into something by its very nature", "There is inherent risk in any race longer than you have trained for."],
+    ["Jeopardize", "To put something at risk of loss or harm", "Skipping the taper could jeopardize months of training."],
+    ["Lucid", "Clear and easy to understand", "He gave a lucid explanation that the whole room followed."],
+    ["Mundane", "Ordinary and dull", "Most of the job is mundane, and that is exactly where mistakes hide."],
+    ["Nonchalant", "Calm and casual, as if not worried at all", "He stayed nonchalant when the interviewer asked about the layoff."],
+    ["Paramount", "More important than anything else", "Family is paramount; everything else fits around it."],
+    ["Plausible", "Reasonable enough that it might be true", "It is a plausible story, but there is no data behind it yet."],
+    ["Pivotal", "Of key importance at a turning point", "Getting let go turned out to be a pivotal moment in his career."],
+    ["Proficient", "Skilled at something through practice", "After a year of practice she was proficient in Python."],
+    ["Prolific", "Producing a large amount of work", "A prolific writer can draft a new essay every day."],
+    ["Reconcile", "To make two things agree or fit together", "He had to reconcile the bank statement with his own records."],
+    ["Rigorous", "Extremely thorough and strict", "The test was rigorous, with real prices and no peeking at the answers."],
+    ["Scrutinize", "To examine very closely", "Admissions committees scrutinize every gap in a resume."],
+    ["Unprecedented", "Never having happened before", "The drop was unprecedented; nothing in the records looked like it."],
+    ["Versatile", "Able to do many different things well", "A versatile employee can cover for almost anyone on the team."],
+    ["Wary", "Cautious because of possible danger", "Be wary of any offer that needs an answer today."],
+    ["Advocate", "To publicly support a cause or a person", "A good manager will advocate for you in rooms you are not in."],
+    ["Anecdotal", "Based on personal stories rather than data", "One friend getting rich is anecdotal evidence, not proof."],
+    ["Arbitrary", "Chosen on a whim, not for a real reason", "The Friday deadline felt arbitrary; nothing actually depended on it."],
+    ["Benevolent", "Kind and wanting to do good for others", "A benevolent boss gives credit away and takes the blame."],
+    ["Coherent", "Logical and consistent, with parts that fit together", "The essay needs one coherent story, not five separate wins."],
+    ["Compelling", "So convincing or interesting that it holds your attention", "The most compelling essays show a real setback and what came next."],
+    ["Comprehensive", "Covering everything; complete", "She gave a comprehensive answer that left no follow-up questions."],
+    ["Conducive", "Making a certain outcome more likely", "A quiet room is conducive to deep work."],
+    ["Consensus", "General agreement within a group", "The team reached a consensus after an hour of debate."],
+    ["Deliberate", "Done on purpose after careful thought", "Every part of his morning routine is deliberate."],
+    ["Detrimental", "Causing harm or damage", "Too little sleep is detrimental to training and to judgment."],
+    ["Diplomatic", "Handling people with tact so no one is offended", "Her diplomatic reply settled the argument without picking a side."],
+    ["Discrepancy", "A difference between things that should match", "The auditor found a discrepancy between the invoice and the payment."],
+    ["Empirical", "Based on observation and evidence rather than theory", "The claim sounded smart, but there was no empirical support for it."],
+    ["Endeavor", "A serious attempt to achieve something", "Starting a company is a risky endeavor."],
+    ["Enigmatic", "Mysterious and hard to figure out", "Her enigmatic smile gave away nothing about the decision."],
+    ["Frugal", "Careful not to waste money", "His parents were frugal so the kids could have more."],
+    ["Gregarious", "Fond of company; very sociable", "A gregarious classmate can turn a networking event into a party."],
+    ["Hinder", "To slow something down or get in its way", "Too many meetings hinder real progress."],
+    ["Impetus", "The force or reason that gets something started", "The layoff was the impetus for his business school applications."],
+    ["Indispensable", "Absolutely necessary; impossible to do without", "A good calendar is indispensable during application season."],
+    ["Inevitable", "Certain to happen; impossible to avoid", "Bad weeks are inevitable; quitting after one is not."],
+    ["Magnitude", "Great size or importance", "Nobody understood the magnitude of the problem until the numbers came in."],
+    ["Optimal", "The best possible", "Seven hours is the optimal amount of sleep before a long ride."],
+    ["Paradigm", "A standard model or way of thinking about something", "Remote work changed the paradigm of what an office is for."],
+    ["Precedent", "An earlier event used as an example for later ones", "Letting one person skip the rule sets a precedent for everyone."],
+    ["Preclude", "To make something impossible in advance", "A missing signature can preclude the whole application."],
+    ["Proactive", "Acting ahead of time instead of waiting for problems", "Being proactive means emailing the recruiter before they email you."],
+    ["Rapport", "A friendly understanding between people", "Five minutes of small talk can build rapport before the interview."],
+    ["Reluctant", "Unwilling and hesitant", "He was reluctant to ask for help, then wished he had asked sooner."],
+    ["Scrupulous", "Very careful to be honest and correct", "A scrupulous accountant flags even a one-dollar error."],
+    ["Superfluous", "More than is needed; unnecessary", "Cut every superfluous word from the essay."],
+    ["Tact", "Skill at saying hard things without offending", "It takes tact to tell a friend their plan has a hole in it."],
+    ["Trivial", "Small and unimportant", "Don't waste energy arguing over trivial details."],
+    ["Unanimous", "Agreed on by everyone", "The vote was unanimous; all five said yes."],
+    ["Undermine", "To weaken something gradually or secretly", "Constant complaining can undermine a team's morale."],
+    ["Vehement", "Showing strong, forceful feeling", "She was vehement that the deadline could not move."],
+    ["Vigilant", "Watchful and alert for danger", "Stay vigilant about emails that pretend to be your bank."],
+    ["Zealous", "Extremely enthusiastic and devoted", "A zealous new runner often gets hurt by doing too much too soon."],
+    ["Acumen", "Sharp skill at making good judgments, especially in business", "Her business acumen showed in how fast she spotted the bad deal."],
+    ["Alacrity", "Eager, cheerful readiness", "He accepted the offer with alacrity."],
+    ["Belie", "To give a false impression of something", "His calm voice belied how nervous he was."],
+    ["Burgeoning", "Growing or expanding quickly", "The town's burgeoning food scene drew people from the city."],
+    ["Cajole", "To persuade someone by gentle coaxing or flattery", "She cajoled her brother into signing up for the race."],
+    ["Castigate", "To criticize someone harshly", "The coach castigated the team for skipping practice."],
+    ["Cognizant", "Aware of something", "Be cognizant of the time zone when you schedule the call."],
+    ["Commensurate", "Matching in size or degree; in proportion", "The pay should be commensurate with the responsibility."],
+    ["Conflate", "To wrongly treat two different things as one", "Don't conflate a lucky outcome with a good decision."],
+    ["Conundrum", "A confusing problem with no easy answer", "Choosing between two great schools is a happy conundrum."],
+    ["Dichotomy", "A split into two opposite parts", "The old dichotomy between work and life doesn't fit everyone."],
+    ["Didactic", "Meant to teach, often in a preachy way", "The speech was so didactic that half the room tuned out."],
+    ["Disparage", "To talk about someone or something as bad or worthless", "Never disparage a former employer in an interview."],
+    ["Disseminate", "To spread information widely", "The memo was disseminated to every office by noon."],
+    ["Efficacy", "The ability to produce the intended result", "The study tested the efficacy of the new training plan."],
+    ["Egregious", "Shockingly bad", "Missing the deadline by a week was an egregious error."],
+    ["Emulate", "To copy someone you admire in order to match them", "He tries to emulate his father's work ethic."],
+    ["Exonerate", "To officially clear someone of blame", "The review exonerated the new hire; the error was in the template."],
+    ["Extrapolate", "To estimate the unknown by extending what you already know", "You can't extrapolate a whole season from one good week."],
+    ["Germane", "Relevant to the subject at hand", "Keep your answer germane to the question they asked."],
+    ["Gratuitous", "Done without a good reason; uncalled for", "The gratuitous insult ended the negotiation."],
+    ["Hubris", "Dangerous overconfidence that leads to a fall", "Doubling the bet after three wins was pure hubris."],
+    ["Idiosyncratic", "Odd in a way that is unique to one person", "His idiosyncratic habit of writing in pencil confused coworkers."],
+    ["Impetuous", "Acting quickly without thinking first", "An impetuous reply to an angry email usually makes things worse."],
+    ["Indefatigable", "Never seeming to get tired", "The indefatigable volunteer worked every shift of the weekend."],
+    ["Innocuous", "Harmless and unlikely to offend", "It seemed like an innocuous question, but it touched a nerve."],
+    ["Juxtapose", "To place two things side by side to compare them", "The essay juxtaposes his parents' first jobs with his own."],
+    ["Loquacious", "Very talkative", "The loquacious driver narrated the whole trip."],
+    ["Myopic", "Focused only on the short term; short-sighted", "Cutting the training budget to hit one quarter's numbers was myopic."],
+    ["Obsequious", "Too eager to please or obey", "The obsequious salesman agreed with everything we said."],
+    ["Ostentatious", "Showy in a way meant to impress", "He drove an ostentatious gold car to the reunion."],
+    ["Palpable", "So intense it can almost be felt", "The tension in the room was palpable."],
+    ["Paucity", "A lack or small amount of something", "The paucity of data made the forecast a guess."],
+    ["Pedantic", "Overly focused on small rules and details", "Correcting someone's grammar mid-story comes off as pedantic."],
+    ["Placate", "To calm someone who is upset, often by giving in a little", "They offered a refund to placate the angry customer."],
+    ["Precipitous", "Very steep or sudden", "Sales took a precipitous drop after the recall."],
+    ["Proclivity", "A natural tendency toward something", "He has a proclivity for taking on more than he can finish."],
+    ["Prosaic", "Plain and unimaginative", "The prosaic answer is usually the true one; he just forgot."],
+    ["Quintessential", "The most perfect example of something", "The diner is the quintessential small-town hangout."],
+    ["Rescind", "To officially take back an offer or decision", "The company rescinded the job offer after the merger."],
+    ["Sanctimonious", "Acting morally superior to others", "Nobody likes a sanctimonious lecture about saving money."],
+    ["Serendipity", "Finding something good by happy chance", "Meeting his future cofounder on a delayed flight was pure serendipity."],
+    ["Stoic", "Enduring pain or hardship without complaining", "She stayed stoic through the last ten miles of the marathon."],
+    ["Tacit", "Understood without being said out loud", "There was a tacit agreement that nobody would bring up politics at dinner."],
+    ["Tantamount", "Equal in effect to", "Ignoring the email was tantamount to saying no."],
+    ["Trepidation", "Nervous fear about what might happen", "He opened the admissions portal with trepidation."],
+    ["Unequivocal", "Leaving no doubt at all", "Her answer was an unequivocal yes."],
+    ["Vacillate", "To keep switching between opinions or choices", "He vacillated between the two offers for a week."],
+    ["Venerable", "Respected because of age, wisdom or long service", "The venerable professor had taught for forty years."],
+    ["Veracity", "Truthfulness; accuracy", "The fact-checker questioned the veracity of the quote."],
+    ["Vicarious", "Felt through someone else's experience", "She took vicarious pride in her brother's graduation."],
+    ["Wistful", "Sadly longing for something in the past", "He took a wistful look at the old neighborhood."],
+    ["Zeitgeist", "The spirit or mood of a particular time", "The show captured the zeitgeist of the early 2000s."],
+    ["Caveat", "A warning or condition attached to something", "One caveat: the discount only applies before Friday."],
+    ["Ad hoc", "Made for one specific purpose, not planned ahead", "They formed an ad hoc committee to plan the reunion."],
+    ["Bona fide", "Genuine and real", "He is a bona fide expert, not someone who read one article."],
+    ["De facto", "True in practice, even if not official", "She became the de facto leader once the manager left."],
+    ["Status quo", "The way things are now", "Doing nothing keeps the status quo."],
+    ["Quid pro quo", "A favor given in exchange for another favor", "The introduction wasn't free; it was a quid pro quo."],
+    ["Carte blanche", "Complete freedom to act as you wish", "The new chef was given carte blanche to redo the menu."]
+  ];
+  EVERYDAY.forEach(function (w) { T.push([w[0], [], 'Everyday', w[1], w[2]]); });
   var byKey = {}, alts = [];
-  T.forEach(function (t, i) { t[1].concat([t[0]]).forEach(function (a) { var k = a.toLowerCase(); if (!byKey[k]) { byKey[k] = i; alts.push(a); } }); });
+  T.forEach(function (t, i) { if (t[2] === 'Everyday') return; t[1].concat([t[0]]).forEach(function (a) { var k = a.toLowerCase(); if (!byKey[k]) { byKey[k] = i; alts.push(a); } }); });
   alts.sort(function (a, b) { return b.length - a.length; });
   function escRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   // ALL-CAPS abbreviations (UTG, BB, CO, EV…) only match in capitals; everything else ignores case. Word edges so "set" doesn't match "settle".
@@ -186,9 +311,11 @@ var GL = (function () {
     d.querySelector('#glall').onclick = function () { d.remove(); screen(t[2].split(' ')[0]); };
     clearTimeout(show.t); show.t = setTimeout(function () { if (d.parentNode) d.remove(); }, 15000);
   }
+  var AREAS = ['Poker', 'Trading', 'Chess', 'Xiangqi', 'Everyday'];
+  var AREA_NOTE = { Everyday: 'Sophisticated words for daily life' };
   function screen(area) {
     App.screen('Words to know', function (v) {
-      var areas = ['Poker', 'Trading', 'Chess', 'Xiangqi'], cur = area || 'Poker';
+      var areas = AREAS, cur = area || 'Poker';
       v.innerHTML = '<div><span class="eyebrow">Plain-English dictionary</span><h1>Words to know</h1><p class="mute small">Tap any underlined word anywhere in the app to see its meaning. Here is the full list.</p></div><div class="seg" id="gla">' + areas.map(function (a) { return '<button data-a="' + a + '" aria-pressed="' + (a === cur) + '">' + a + '</button>'; }).join('') + '</div><div class="list" id="gll"></div>';
       function list(a) {
         $$('#gla [data-a]', v).forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.a === a); });
@@ -200,8 +327,12 @@ var GL = (function () {
   }
   var $ = App.$, $$ = App.$$;
   // ---------- Words to Know drill: learn the jargon for real, with spaced repetition ----------
-  var AREAS = ['Poker', 'Trading', 'Chess', 'Xiangqi'];
-  function mask(text, t) { var out = text; t[1].concat([t[0]]).sort(function (a, b) { return b.length - a.length; }).forEach(function (a) { out = out.replace(new RegExp(escRe(a), 'gi'), '____'); }); return out; }
+  function mask(text, t) {
+    var out = text;
+    if (t[2] === 'Everyday') out = out.replace(new RegExp('\\b' + escRe(t[0].replace(/e$/, '')) + '\\w*', 'gi'), '____');  // whole word incl. endings: belied, scrutinizing
+    t[1].concat([t[0]]).sort(function (a, b) { return b.length - a.length; }).forEach(function (a) { out = out.replace(new RegExp(escRe(a), 'gi'), '____'); });
+    return out;
+  }
   function short(def) { var m = def.match(/^[^.:]*[.:]/); var cut = m ? m[0] : def; return cut.length > 24 ? cut : def; }
   function dueCount() { var g = gst(); return Object.keys(g.tapped).filter(function (i) { return (g.box[i] || 0) < 3; }).length; }
   function mastered(area) { var g = gst(); return T.filter(function (t, i) { return (!area || t[2].indexOf(area) >= 0) && (g.box[i] || 0) >= 3; }).length; }
@@ -261,8 +392,8 @@ var GL = (function () {
           };
         });
       }
-      v.innerHTML = '<div><span class="eyebrow">Learn the language</span><h1>Words to Know</h1><p class="mute small">Every term the app uses, drilled three ways: word → meaning, meaning → word, and the word in a real example. Words you tap for help or miss come back first. A word is mastered once you get it right 3 times.</p></div>' +
-        '<div class="list">' + AREAS.map(function (a) { var tot = T.filter(function (t) { return t[2].indexOf(a) >= 0; }).length; return '<button class="item" data-area="' + a + '"><span class="grow"><span class="t">' + a + ' words</span><br><span class="s">' + mastered(a) + ' of ' + tot + ' mastered</span></span><span class="end">›</span></button>'; }).join('') + '</div>' +
+      v.innerHTML = '<div><span class="eyebrow">Learn the language</span><h1>Words to Know</h1><p class="mute small">Every term the app uses, plus sophisticated everyday words, drilled three ways: word → meaning, meaning → word, and the word in a real example. Words you tap for help or miss come back first. A word is mastered once you get it right 3 times.</p></div>' +
+        '<div class="list">' + AREAS.map(function (a) { var tot = T.filter(function (t) { return t[2].indexOf(a) >= 0; }).length; return '<button class="item" data-area="' + a + '"><span class="grow"><span class="t">' + a + ' words</span><br><span class="s">' + (AREA_NOTE[a] ? AREA_NOTE[a] + ' · ' : '') + mastered(a) + ' of ' + tot + ' mastered</span></span><span class="end">›</span></button>'; }).join('') + '</div>' +
         '<button class="btn ghost" id="glist">Browse the full dictionary</button>';
       $$('[data-area]', v).forEach(function (b) { b.onclick = function () { focus = b.dataset.area; ask(); }; });
       $('#glist', v).onclick = function () { screen(focus); };
