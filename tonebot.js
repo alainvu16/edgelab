@@ -5,15 +5,17 @@ var TB = (function () {
   var TAGS = { proven: ['good', '✅ Proven'], half: ['warn', '🟡 Half-proven'], no: ['bad', '❌ Not proven'], rule: ['ok', '📘 Your rule'] };
   // Lessons and live bot facts are PRIVATE: they load from Alain's private repo (edgelab-data) with the
   // phone's own GitHub key, and are cached on the phone for offline. Nothing ToneBot-specific is in this public file.
-  var L = [], T = null, CK = 'edgelab.tb.cache';
+  var L = [], T = null, CK = 'edgelab.tb.cache', C = null, CCK = 'edgelab.tb.course';
+  try { C = JSON.parse(localStorage.getItem(CCK) || 'null'); } catch (e) {}
   try { var c0 = JSON.parse(localStorage.getItem(CK) || 'null'); if (c0) { L = c0.lessons || []; T = c0.data || null; } } catch (e) {}
   var lastFetch = 0;
   function refresh(done) {
     // at most once every 10 minutes, and only report "changed" when the content really differs (no re-render loops)
     if (!App.ghGetJSON || !App.ghConnected() || Date.now() - lastFetch < 600000) { if (done) done(false); return; }
     lastFetch = Date.now();
-    Promise.all([App.ghGetJSON('tonebot-lessons.json'), App.ghGetJSON('tonebot.json')]).then(function (r) {
+    Promise.all([App.ghGetJSON('tonebot-lessons.json'), App.ghGetJSON('tonebot.json'), App.ghGetJSON('tonebot-course.json')]).then(function (r) {
       var changed = false;
+      if (r[2] && r[2].blocks && r[2].blocks.length && (!C || C.updated !== r[2].updated)) { C = r[2]; changed = true; try { localStorage.setItem(CCK, JSON.stringify(C)); } catch (e) {} }
       if (r[0] && r[0].lessons && r[0].lessons.length && JSON.stringify(r[0].lessons) !== JSON.stringify(L)) { L = r[0].lessons; changed = true; }
       if (r[1] && JSON.stringify(r[1]) !== JSON.stringify(T)) { T = r[1]; changed = true; }
       if (changed) try { localStorage.setItem(CK, JSON.stringify({ lessons: L, data: T, at: Date.now() })); } catch (e) {}
@@ -33,10 +35,11 @@ var TB = (function () {
         botPanel(T, s) +
         '<button class="item" id="mc" style="border-color:var(--accent)"><span class="grow"><span class="t">☀️ Daily drill: you vs ToneBot</span><br><span class="s">' + esc(drillStatus()) + ' · ' + esc(recShort()) + '</span></span><span class="end">›</span></button>' +
         '<div class="btns"><button class="btn" id="rr">Rotation Replay: you vs the bot</button></div>' +
+        (C && C.blocks ? '<button class="item" id="lc"><span class="grow"><span class="t">📚 Learn course</span><br><span class="s">The bot’s full course · ' + courseTracks().length + ' tracks · ' + C.blocks.filter(function (b) { return b[0] === 'h3'; }).length + ' lessons · tagged 📘 / 🧪 / ✅</span></span><span class="end">›</span></button>' : '') +
         '<h2>Lessons</h2><div class="list">' + L.map(function (l, i) { var tg = TAGS[l.tag]; return '<button class="item" data-l="' + i + '"><span class="grow"><span class="t">' + esc(l.t) + '</span><br><span class="s">' + tg[1] + '</span></span><span class="end">' + (s.done[l.id] ? '✓' : '›') + '</span></button>'; }).join('') + '</div>' +
         '<p class="small mute">Learning only. Nothing here changes what ToneBot trades. Market questions are for learning, not investment advice.</p>';
       $$('[data-l]', v).forEach(function (b) { b.onclick = function () { lesson(+b.dataset.l); }; });
-      $('#rr', v).onclick = replay; $('#mc', v).onclick = drill;
+      $('#rr', v).onclick = replay; $('#mc', v).onclick = drill; if ($('#lc', v)) $('#lc', v).onclick = course;
     });
   }
   function pct(x) { return x == null ? '—' : (x >= 0 ? '+' : '') + (x * 100).toFixed(1) + '%'; }
@@ -130,6 +133,41 @@ var TB = (function () {
         });
       }
       round();
+    });
+  }
+
+
+  // ---------- LEARN COURSE (Oct 17): the bot's full course, the same text the Google Doc had, read from tonebot-course.json ----------
+  function courseTracks() {
+    var out = [], cur = null;
+    ((C && C.blocks) || []).forEach(function (b) { if (b[0] === 'h1') { cur = { t: b[1], b: [] }; out.push(cur); } else if (cur) cur.b.push(b); });
+    return out;
+  }
+  function course() {
+    App.screen('Learn course', function (v) {
+      var tr = courseTracks();
+      v.innerHTML = '<div><span class="eyebrow">ToneBot · updated ' + esc((C && C.updated) || '') + '</span><h1>Learn course</h1><p class="mute small">📘 general knowledge · 🧪 UNTESTED: how the bot trades, not proven to win · ✅ PROVEN: passed the bot’s tests.</p></div>' +
+        '<div class="list">' + tr.map(function (t, i) { var n = t.b.filter(function (b) { return b[0] === 'h3'; }).length; return '<button class="item" data-t="' + i + '"><span class="grow"><span class="t">' + esc(splitT(t.t)[0]) + '</span><br><span class="s">' + esc(splitT(t.t)[1]) + ' · ' + (n ? n + (n === 1 ? ' lesson' : ' lessons') : t.b.length + ' entries') + '</span></span><span class="end">›</span></button>'; }).join('') + '</div>' +
+        '<p class="small mute">Learning only, not advice for real money.</p>';
+      $$('[data-t]', v).forEach(function (b) { b.onclick = function () { track(tr[+b.dataset.t]); }; });
+    });
+  }
+  function splitT(x) { var m = x.match(/^(.*?)\s—\s((?:📘|🧪|✅|🔒).*)$/u); return m ? [m[1], m[2]] : [x, '']; }
+  function track(t) {
+    var nm = splitT(t.t);
+    App.screen(nm[0].split(' — ')[0], function (v) {
+      var h = '', open = false, lvl = false;
+      function close() { if (open) { h += '</details>'; open = false; } }
+      t.b.forEach(function (b) {
+        var st = b[0], x = esc(b[1]);
+        if (st === 'h2') { close(); h += '<details class="panel" style="padding:12px 14px"><summary style="cursor:pointer"><b>' + x + '</b></summary>'; open = true; lvl = true; }
+        else if (st === 'h3') h += '<h3 style="margin:14px 0 4px">' + x + '</h3>';
+        else if (st === 'q') h += '<p class="small" style="margin:8px 0 2px"><b>' + x + '</b></p>';
+        else if (st === 'a') h += '<details class="small" style="margin:0 0 6px"><summary class="mute" style="cursor:pointer">Show answer</summary><p class="small">' + x + '</p></details>';
+        else h += '<p class="small" style="overflow-wrap:anywhere">' + x + '</p>';
+      });
+      close();
+      v.innerHTML = '<div><span class="eyebrow">Learn course</span><h1>' + esc(nm[0]) + '</h1><p class="mute small">' + esc(nm[1]) + '</p></div>' + (lvl ? '' : '<div class="panel">') + h + (lvl ? '' : '</div>');
     });
   }
 
@@ -278,5 +316,5 @@ var TB = (function () {
   function recShort() { var r = record(graded()); return r.n ? r.avg + '/100 avg over ' + r.n + ' days' : 'no graded days yet'; }
   function drillStatus() { var day = drillDay(); return ds()[day] ? 'Drill locked for ' + nice(day) : (windowOpen() ? 'Drill open until 9:25 AM ET' : 'Next drill: ' + nice(day)); }
 
-  return { home: home, lesson: lesson, replay: replay, myCall: drill, drill: drill, drillStatus: drillStatus, refresh: refresh, count: function () { return L.length; }, done: function () { return L.filter(function (l) { return st().done[l.id]; }).length; } };
+  return { home: home, course: course, lesson: lesson, replay: replay, myCall: drill, drill: drill, drillStatus: drillStatus, refresh: refresh, count: function () { return L.length; }, done: function () { return L.filter(function (l) { return st().done[l.id]; }).length; } };
 })();
