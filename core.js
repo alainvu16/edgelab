@@ -599,7 +599,8 @@ var App = (function () {
         item('mkt', '↗', 'Markets', 'Trading concepts and chart practice') +
         '</div>' +
         '<div class="row"><button class="btn sm ghost" id="sess">Session &amp; break settings</button><button class="btn sm ghost" id="bk">Backups</button><button class="btn sm ghost" id="reset">Reset progress</button><button class="btn sm ghost" id="fxt">Celebrations: ' + (S.fx === false ? 'off' : 'on') + '</button><span class="small mute" id="cs">' + (cloudStatus === 'ok' ? 'Progress synced to your account' : cloudStatus === 'err' ? 'Saved on this device only' : 'Saved on this device') + '</span></div>' +
-        '<p class="small mute">Market questions are for learning, not investment advice. Practice charts use simulated prices.</p>';
+        '<p class="small mute">Market questions are for learning, not investment advice. Practice charts use simulated prices.</p>' +
+        '<p class="mute mono" style="font-size:10px;opacity:.6">screen ' + screen.width + '×' + screen.height + ' · view ' + innerWidth + '×' + innerHeight + (window.visualViewport ? ' · vv ' + Math.round(visualViewport.height) : '') + (navigator.standalone ? ' · app' : '') + '</p>';
       $$('[data-s]', v).forEach(function (b) { b.onclick = function () { startSession(+b.dataset.s); home(); }; });
       $('#go', v).onclick = function () { tab(sug[0]); };
       $$('[data-go]', v).forEach(function (b) { b.onclick = function () { tab(b.dataset.go); }; });
