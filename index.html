@@ -66,6 +66,7 @@ p{margin:0}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .grow{flex:1;min-width:0}
 .btn{appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--fg);border-radius:11px;padding:11px 14px;font:600 15px var(--body);cursor:pointer;text-align:center}
+a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.ghost{background:none}
 .btn.sm{padding:7px 11px;font-size:13px;border-radius:9px}
@@ -251,24 +252,24 @@ p{margin:0}
 </div>
 <div id="modal"></div>
 
-<script src="chess.js?v=30"></script>
-<script src="core.js?v=30"></script>
-<script src="content.js?v=30"></script>
-<script src="engine.js?v=30"></script>
-<script src="puzzles.js?v=30"></script>
-<script src="chess-app.js?v=30"></script>
-<script src="xq-engine.js?v=30"></script>
-<script src="xq.js?v=30"></script>
-<script src="poker.js?v=30"></script>
-<script src="mktdata.js?v=30"></script>
-<script src="tapedata.js?v=30"></script>
-<script src="momentum.js?v=30"></script>
-<script src="wisdom.js?v=30"></script>
-<script src="think.js?v=30"></script>
-<script src="macro.js?v=30"></script>
-<script src="tape.js?v=30"></script>
-<script src="markets.js?v=30"></script>
-<script src="roadmap.js?v=30"></script>
+<script src="chess.js?v=31"></script>
+<script src="core.js?v=31"></script>
+<script src="content.js?v=31"></script>
+<script src="engine.js?v=31"></script>
+<script src="puzzles.js?v=31"></script>
+<script src="chess-app.js?v=31"></script>
+<script src="xq-engine.js?v=31"></script>
+<script src="xq.js?v=31"></script>
+<script src="poker.js?v=31"></script>
+<script src="mktdata.js?v=31"></script>
+<script src="tapedata.js?v=31"></script>
+<script src="momentum.js?v=31"></script>
+<script src="wisdom.js?v=31"></script>
+<script src="think.js?v=31"></script>
+<script src="macro.js?v=31"></script>
+<script src="tape.js?v=31"></script>
+<script src="markets.js?v=31"></script>
+<script src="roadmap.js?v=31"></script>
 <script>
 window.addEventListener('error', function (e) {
   try { (window.__errs = window.__errs || []).push(new Date().toISOString().slice(0, 16) + ' ' + (e.message || e) + (e.filename ? ' @' + e.filename.split('/').pop().split('?')[0] + ':' + e.lineno : '')); if (window.__errs.length > 30) window.__errs.shift(); } catch (x) {}

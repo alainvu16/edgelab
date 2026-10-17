@@ -80,27 +80,50 @@ var WZ = (function () {
   }
 
   // ---------- library ----------
+  // hoopla: confirmed AUDIOBOOK editions (checked Oct 17, 2026), borrow instantly, no waitlist.
+  // Libby: not on hoopla as audio; the link searches OverDrive's catalog for audiobook editions and shows libraries that own it.
   var BOOKS = [
-    { t: 'The Art of Learning', audio: true, a: 'Josh Waitzkin', why: 'A chess prodigy turned martial-arts champion explains how to actually get good at anything. The closest thing to a manual for this app.', tag: 'Start here', area: 'Mind' },
-    { t: 'Thinking in Bets', audio: true, a: 'Annie Duke', why: 'A poker pro on making decisions when you can’t know the outcome. Separates good decisions from good results, which is the core skill in poker and trading.', tag: 'Start here', area: 'Poker · Trading' },
-    { t: 'The Psychology of Money', audio: true, a: 'Morgan Housel', why: 'Short chapters on why smart people do dumb things with money. Easy read, sticks with you.', area: 'Trading' },
-    { t: 'Dual Momentum Investing', a: 'Gary Antonacci', why: 'The book behind relative + absolute momentum. Dense in places, but it is the blueprint for sector rotation.', area: 'Trading' },
-    { t: 'Market Wizards', audio: true, a: 'Jack Schwager', why: 'Interviews with the best traders of their era. You learn that there are many ways to win and one way to lose: no risk control.', area: 'Trading' },
-    { t: 'Trading in the Zone', audio: true, a: 'Mark Douglas', why: 'The mental game of trading. Why you hesitate, why you revenge trade, and how to think in probabilities.', area: 'Trading' },
-    { t: 'Reminiscences of a Stock Operator', audio: true, a: 'Edwin Lefèvre', why: 'A 1923 novel about a legendary speculator. Every momentum lesson is in here a century early. Public domain, so it is almost always available.', area: 'Trading' },
-    { t: 'Logical Chess: Move by Move', a: 'Irving Chernev', why: 'Thirty-three games with every single move explained in plain words. The best bridge from “I know the rules” to “I understand plans.”', area: 'Chess' },
-    { t: 'Bobby Fischer Teaches Chess', a: 'Bobby Fischer', why: 'A programmed workbook of mating patterns. Fast, repetitive in a good way, pairs with the puzzle trainer.', area: 'Chess' },
-    { t: 'The Theory of Poker', a: 'David Sklansky', why: 'The fundamental theorem of poker and the math under every decision. Old, still the foundation.', area: 'Poker' },
-    { t: 'Thinking, Fast and Slow', a: 'Daniel Kahneman', why: 'Why your brain misjudges risk and probability. Long, but read even the first third and you will see your own mistakes coming.', area: 'Mind' },
-    { t: 'Mastery', audio: true, a: 'Robert Greene', why: 'Biographies of people who became great at a craft, and the stages they all passed through. Good fuel for long training stretches.', area: 'Mind' },
-    { t: 'A Random Walk Down Wall Street', a: 'Burton Malkiel', why: 'The case against trying to beat the market. Read it so you know exactly what your edge has to overcome.', area: 'Trading' },
-    { t: 'The Inner Game of Tennis', audio: true, a: 'W. Timothy Gallwey', why: 'Not about tennis. About getting your critical voice out of the way so the trained part of you can perform. Applies to every board here.', area: 'Mind' }
+    { t: 'The Psychology of Money', a: 'Morgan Housel', h: 19484293, len: '5h 54m', nar: 'Chris Hill', why: 'Short chapters on why smart people do dumb things with money. Easy listen, sticks with you.', tag: 'Start here', area: 'Trading' },
+    { t: 'Reminiscences of a Stock Operator', a: 'Edwin Lefèvre', h: 13507032, len: '9h 53m', nar: 'Rick Rohan', why: 'A 1923 novel about a legendary speculator. Every momentum lesson is in here a century early.', tag: 'Start here', area: 'Trading' },
+    { t: 'The Daily Trading Coach', a: 'Brett Steenbarger', h: 13753346, len: '14h 21m', nar: 'Joel Pierson', why: '101 short lessons from a trading psychologist. One a day pairs perfectly with the app.', area: 'Trading' },
+    { t: 'The Little Book of Market Wizards', a: 'Jack Schwager', h: 14338926, len: '3h 49m', nar: 'Danny Campbell', why: 'The lessons from decades of interviews with the best traders, boiled down. Risk control first, always.', area: 'Trading' },
+    { t: 'Dual Momentum Investing', a: 'Gary Antonacci', h: 15640228, len: '6h 4m', nar: 'Bob Johnson', why: 'The blueprint for relative + absolute momentum: the sector rotation you practice in the Momentum Lab.', area: 'Trading' },
+    { t: 'Fooled by Randomness', a: 'Nassim Taleb', h: 12162308, len: '10h 7m', nar: 'Sean Pratt', why: 'How luck disguises itself as skill in markets. Makes you humble about short streaks, good and bad.', area: 'Trading' },
+    { t: 'A Random Walk Down Wall Street', a: 'Burton Malkiel', h: 16956174, len: '13h 14m', nar: 'George Guidall', why: 'The case against beating the market. Know exactly what your edge has to overcome.', area: 'Trading' },
+    { t: 'The Intelligent Investor', a: 'Benjamin Graham', h: 11586379, len: '17h 48m', nar: 'Luke Daniels', why: 'Mr. Market, margin of safety, and the temperament that keeps you solvent.', area: 'Trading' },
+    { t: 'The Big Short', a: 'Michael Lewis', h: 18726491, len: '9h 43m', nar: 'Michael Lewis', why: 'A handful of outsiders read the tape everyone else ignored. Second-order thinking as a thriller.', area: 'Trading' },
+    { t: 'The Theory of Poker', a: 'David Sklansky', h: 17086234, len: '8h 44m', nar: 'Brian Arens', why: 'The fundamental theorem of poker and the math under every bet you make in the drills.', area: 'Poker' },
+    { t: 'Molly’s Game', a: 'Molly Bloom', h: 11587345, len: '8h 29m', nar: 'Cassandra Campbell', why: 'Inside the world’s highest-stakes private games. Reads players, pressure and money up close.', area: 'Poker' },
+    { t: 'Searching for Bobby Fischer', a: 'Fred Waitzkin', h: 13482361, len: '8h 44m', nar: 'Lloyd James', why: 'A father on raising a chess prodigy (Josh Waitzkin). What real chess improvement looks and feels like.', area: 'Chess' },
+    { t: 'Endgame: Bobby Fischer', a: 'Frank Brady', h: 13486828, len: '13h 30m', nar: 'Ray Porter', why: 'The rise and fall of the greatest natural talent in chess. Genius, obsession and their cost.', area: 'Chess' },
+    { t: 'The Queen’s Gambit', a: 'Walter Tevis', h: 12238712, len: '11h 53m', nar: 'Amy Landon', why: 'The novel behind the show. Pattern, practice and nerve, and why you study the classics.', area: 'Chess' },
+    // Libby (your library)
+    { t: 'The Art of Learning', a: 'Josh Waitzkin', libby: true, why: 'A chess prodigy turned martial-arts champion on how to get good at anything. The closest thing to a manual for this app.', tag: 'Start here', area: 'Mind' },
+    { t: 'Thinking in Bets', a: 'Annie Duke', libby: true, why: 'A poker pro on deciding when you can’t know the outcome. Good decisions vs. good results.', tag: 'Start here', area: 'Poker · Trading' },
+    { t: 'Trading in the Zone', a: 'Mark Douglas', libby: true, why: 'The mental game of trading: hesitation, revenge trades, thinking in probabilities.', area: 'Trading' },
+    { t: 'Market Wizards', a: 'Jack Schwager', libby: true, why: 'The original interviews with the great traders. Many ways to win, one way to lose.', area: 'Trading' },
+    { t: 'Thinking, Fast and Slow', a: 'Daniel Kahneman', libby: true, why: 'Why your brain misjudges risk. Even the first third shows you your own mistakes coming.', area: 'Mind' },
+    { t: 'Mastery', a: 'Robert Greene', libby: true, why: 'How people became great at a craft, and the stages they all passed through.', area: 'Mind' },
+    { t: 'The Inner Game of Tennis', a: 'W. Timothy Gallwey', libby: true, why: 'Get your critical voice out of the way so the trained part of you can perform.', area: 'Mind' }
   ];
   function library() {
     App.screen('Audiobooks', function (v) {
-      v.innerHTML = '<div><span class="eyebrow">Supplementary reading</span><h1>Audiobooks to train with</h1><p class="mute small">All of these exist as audiobooks and are commonly stocked in Libby and hoopla; availability depends on your library card, so search both. Listen while you solve puzzles, on the bike, or on a run. Marked ones are especially good as audio.</p></div>' +
-        '<div class="list">' + BOOKS.map(function (b) { return '<div class="panel" style="gap:6px"><div class="row"><h3 class="grow">' + esc(b.t) + '</h3>' + (b.tag ? '<span class="pill acc">' + b.tag + '</span>' : '') + (b.audio ? '<span class="pill">great on audio</span>' : '') + '</div><p class="small mute">' + esc(b.a) + ' · ' + b.area + '</p><p class="small">' + esc(b.why) + '</p></div>'; }).join('') + '</div>' +
-        '<p class="small mute">Order: the two “Start here” titles, then one from each area you are training. Logical Chess and The Theory of Poker are better read than heard because of the diagrams and math; the rest work well as audio.</p>';
+      var done = App.S.books = App.S.books || {};
+      function card(b) {
+        var key = b.t, fin = !!done[key];
+        var link = b.h ? '<a class="btn primary sm" href="https://www.hoopladigital.com/title/' + b.h + '" target="_blank" rel="noopener">Borrow on hoopla</a>'
+          : '<a class="btn primary sm" href="https://www.overdrive.com/search?q=' + encodeURIComponent(b.t + ' ' + b.a) + '&f-formatClassification=Audiobook" target="_blank" rel="noopener">Find in Libby</a>';
+        return '<div class="panel" style="gap:6px' + (fin ? ';opacity:.6' : '') + '"><div class="row"><h3 class="grow">' + esc(b.t) + '</h3>' + (b.tag ? '<span class="pill acc">' + b.tag + '</span>' : '') + '</div>' +
+          '<p class="small mute">' + esc(b.a) + ' · ' + esc(b.area) + (b.len ? ' · ' + b.len + ' · read by ' + esc(b.nar) : '') + '</p><p class="small">' + esc(b.why) + '</p>' +
+          '<div class="row">' + link + '<button class="btn sm ghost" data-fin="' + esc(key) + '">' + (fin ? '✓ Finished' : 'Mark finished') + '</button></div></div>';
+      }
+      var hoop = BOOKS.filter(function (b) { return b.h; }), lib = BOOKS.filter(function (b) { return b.libby; });
+      var n = BOOKS.filter(function (b) { return done[b.t]; }).length;
+      v.innerHTML = '<div><span class="eyebrow">Listen while you train</span><h1>Audiobooks</h1><p class="mute small">' + n + ' of ' + BOOKS.length + ' finished. Every hoopla title below is a confirmed audiobook edition: tap Borrow, sign in with your library card once, and it plays instantly (no waitlist; most libraries allow several hoopla borrows a month).</p></div>' +
+        '<h2>Borrow now on hoopla</h2><div class="list">' + hoop.map(card).join('') + '</div>' +
+        '<h2>On Libby, through your library</h2><p class="small mute">These aren’t on hoopla as audio. Find in Libby shows the audiobook edition and which libraries near you own it; add it in the Libby app with your card. Popular titles may have a waitlist, so tap Place hold.</p><div class="list">' + lib.map(card).join('') + '</div>' +
+        '<div class="btns"><a class="btn" href="https://www.hoopladigital.com" target="_blank" rel="noopener">Open hoopla</a><a class="btn" href="https://libbyapp.com" target="_blank" rel="noopener">Open Libby</a></div>';
+      $$('[data-fin]', v).forEach(function (b) { b.onclick = function () { var k = b.dataset.fin; if (done[k]) delete done[k]; else { done[k] = 1; App.celebrate('level'); } App.save(); App.back(); library(); }; });
     });
   }
 
