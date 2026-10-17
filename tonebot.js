@@ -48,7 +48,7 @@ var TB = (function () {
     var myHits = mine.filter(function (m) { return m.me.lead === m.c.aLead; }).length, botHitsSame = mine.filter(function (m) { return m.c.lead === m.c.aLead; }).length;
     var f = T.forecast, fr = f && f.rows && f.rows.P1;
     return '<div class="panel"><div class="row"><span class="eyebrow grow">From your bot · synced ' + esc(T.updated || '') + '</span>' + (T.crash ? '<span class="pill">Crash meter: ' + esc(T.crash.zone) + '</span>' : '') + '</div>' +
-      '<p class="small"><b>Daily call:</b> ToneBot named the leading theme right on <b>' + hit + ' of ' + c.length + '</b> scored days.' + (mine.length ? ' You: <b>' + myHits + ' of ' + mine.length + '</b> on the same days (bot ' + botHitsSame + ').' : ' Make your own call to compete.') + '</p>' +
+      '<p class="small"><b>Daily call:</b> ToneBot named the leading theme right on <b>' + hit + ' of ' + c.length + '</b> scored days.' + (mine.length ? ' You: <b>' + myHits + ' of ' + mine.length + '</b> on the same days (bot ' + botHitsSame + ').' : ' Beat it in the Daily drill below.') + '</p>' +
       '<div style="overflow-x:auto"><table class="small" style="width:100%;border-collapse:collapse"><tr class="mute"><td>Day</td><td>Bot said lead</td><td>Actually led</td></tr>' + last.map(function (x) { return '<tr><td class="mono">' + esc(x.date.slice(5)) + '</td><td>' + esc(x.lead) + (x.conf ? ' <span class="mute">' + Math.round(x.conf * 100) + '%</span>' : '') + '</td><td>' + (x.aLead ? esc(x.aLead) + (x.aLead === x.lead ? ' ✓' : '') : '<span class="mute">pending</span>') + '</td></tr>'; }).join('') + '</table></div>' +
       (fr ? '<p class="small"><b>Weekly forecast (' + esc(f.week) + '):</b> Paper 1 expected ' + pct(fr.center) + ' (range ' + pct(fr.lo) + ' to ' + pct(fr.hi) + ')' + (fr.actual != null ? ', actual ' + pct(fr.actual) + (fr.inside ? ' — inside the range' : ' — outside the range') : '') + '.</p>' : '') +
       (T.slump ? '<p class="small mute">' + esc(T.slump) + '</p>' : '') + '</div>';
@@ -192,17 +192,19 @@ var TB = (function () {
     return i < 0 ? null : { i: i, why: why };
   }
   function yn(x) { return x == null ? '<span class="mute">—</span>' : x ? '✅' : '❌'; }
+  function line(ok, label, detail) {
+    return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)"><span style="width:20px;flex:none">' + yn(ok) + '</span><div class="grow" style="min-width:0"><b class="small">' + label + '</b><div class="small mute" style="overflow-wrap:anywhere">' + detail + '</div></div><span class="mono small" style="flex:none">' + (ok ? '+25' : '0') + '</span></div>';
+  }
   function scorecard(r, rec) {
     var b = r.bot, did = r.did, bb = did && did.buys && did.buys.length ? did.buys : [];
     var kd = T.days[r.day] || {}, bbTxt = bb.map(function (t) { return esc(t) + (kd[t] != null ? ' ' + pct(kd[t]) : ''); }).join(', ');
     var closer = b ? (r.gChg === r.bChg ? 'Same group as the bot.' : r.gChg > r.bChg ? 'Your group call was closer than ToneBot’s.' : 'ToneBot’s group call was closer than yours.') : 'No bot morning call logged that day.';
     var t = '<div class="panel"><div class="row"><span class="eyebrow grow">Scorecard · ' + nice(r.day) + '</span><span class="pill ' + (r.score >= 75 ? 'good' : r.score >= 50 ? 'ok' : 'warn') + '">' + r.score + '/100</span></div>' +
-      '<div style="overflow-x:auto"><table class="small" style="width:100%;border-collapse:collapse"><tr class="mute"><td></td><td>You</td><td>ToneBot</td><td>Real</td></tr>' +
-      '<tr><td>Leading group</td><td>' + esc(r.a.group) + ' ' + pct(r.gChg) + ' ' + yn(r.gBeat) + '</td><td>' + (b ? esc(b.lead) + ' ' + pct(r.bChg) + ' ' + yn(r.bBeat) : '—') + '</td><td>' + esc(r.leader) + ' ' + pct(r.sect[r.leader]) + '</td></tr>' +
-      '<tr><td>Red / green</td><td>' + esc(r.a.tape) + ' ' + yn(r.tapeHit) + '</td><td class="mute">—</td><td>' + (r.green ? 'green' : 'red') + '</td></tr>' +
-      '<tr><td>10-yr yield</td><td>' + esc(r.a.tnx) + ' ' + yn(r.tnxHit) + '</td><td class="mute">—</td><td>' + (r.tnx > 0 ? 'up' : 'down') + ' ' + pct(r.tnx) + '</td></tr>' +
-      '<tr><td>Buy idea</td><td>' + esc(r.a.idea) + ' (' + esc(r.a.mode) + ') ' + (r.iChg == null ? '<span class="mute">price pending</span>' : pct(r.iChg) + ' ' + yn(r.iBeat)) + '</td><td>' + (bbTxt || 'no buys') + '</td><td>SPY ' + pct(r.spy) + '</td></tr>' +
-      '<tr><td><b>Points</b></td><td><b>' + r.score + '</b></td><td>' + (b ? (r.bBeat ? 25 : 0) + ' <span class="mute">(group only)</span>' : '—') + '</td><td></td></tr></table></div>' +
+      line(r.gBeat, 'Leading group', 'You <b>' + esc(r.a.group) + ' ' + pct(r.gChg) + '</b> · Bot ' + (b ? esc(b.lead) + ' ' + pct(r.bChg) + ' ' + yn(r.bBeat) : '—') + ' · Led: ' + esc(r.leader) + ' ' + pct(r.sect[r.leader]) + ' · SPY ' + pct(r.spy)) +
+      line(r.tapeHit, 'Red or green', 'You <b>' + esc(r.a.tape) + '</b> · Real ' + (r.green ? 'green' : 'red')) +
+      line(r.tnxHit, '10-year yield', 'You <b>' + esc(r.a.tnx) + '</b> · Real ' + (r.tnx > 0 ? 'up' : 'down') + ' ' + pct(r.tnx)) +
+      line(r.iBeat, 'Buy idea', 'You <b>' + esc(r.a.idea) + '</b> (' + esc(r.a.mode) + ') ' + (r.iChg == null ? '<span class="mute">price pending</span>' : pct(r.iChg)) + ' vs SPY ' + pct(r.spy) + ' · Bot bought ' + (bbTxt || 'nothing')) +
+      (b ? '<p class="small mute" style="margin-top:6px">ToneBot only makes the group call: ' + (r.bBeat ? 25 : 0) + ' of 25 on it.</p>' : '') +
       '<p class="small"><b>What the bot did:</b> ' + (did ? 'bought ' + (bb.length ? bb.map(esc).join(', ') : 'nothing') + (did.sells && did.sells.length ? ', sold ' + did.sells.map(esc).join(', ') : '') +
         (did.p1Today != null ? ' · Paper 1 ' + pct(did.p1Today) + ' vs S&amp;P ' + pct(r.spy) + ' (since Oct 12 ' + pct(did.p1Since) + ')' : '') + (did.pos ? ' · ' + did.pos.length + ' open positions' : '') : 'no trades synced for that day') + '. ' + closer + '</p>' +
       '<p class="small mute">' + recLine(rec) + '</p></div>';
@@ -266,7 +268,7 @@ var TB = (function () {
       if (!App.S || !windowOpen() || document.querySelector('.tb-drill')) return;
       var day = drillDay(), s = st(); if (ds()[day] || s.asked === day) return;
       s.asked = day; App.save();
-      var m = App.modal('<span class="eyebrow">ToneBot daily drill</span><h2>4 quick questions</h2><p class="small">Which group leads, red or green, the 10-year, and one buy idea. Lock them by <b>9:25 AM ET</b>, then see ToneBot’s call.</p><div class="btns"><button class="btn primary" id="dgo">Answer now</button><button class="btn" id="dno">Later</button></div>');
+      var m = App.modal('<div class="grab"></div><span class="eyebrow">ToneBot daily drill · ' + esc(nice(day)) + '</span><h2>Beat the bot before the open</h2><p class="mute">Four quick calls: which group leads, red or green, the 10-year, and one buy idea. Lock them by 9:25 AM ET, then see ToneBot’s call.</p><div class="btns"><button class="btn" id="dno">Later</button><button class="btn primary" id="dgo">Start the drill</button></div>');
       $('#dgo', m).onclick = function () { App.closeModal(); drill(); };
       $('#dno', m).onclick = App.closeModal;
     } catch (e) {}
