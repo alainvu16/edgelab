@@ -669,7 +669,7 @@ var App = (function () {
       var sug = suggestion();
       var ss = S.session;
       v.innerHTML =
-        frontHTML(greet) +
+        quoteHTML() + frontHTML(greet) + gamesHTML() +
         (progressScore(S) === 0 ? '<button class="item" id="rsc"><span class="grow"><span class="t">Moving from another device?</span><br><span class="s">Paste your backup code to bring your progress here.</span></span><span class="end">›</span></button>' : '') +
         (QP.active ? '<div class="row"><button class="btn sm ghost" id="qpstop">Stop quick play</button></div>' : '') +
         (typeof RM !== 'undefined' ? '<button class="item" id="path" style="flex-direction:column;align-items:stretch;gap:6px"><div class="row"><span class="t grow">Your path to an edge</span><span class="end">›</span></div>' + RM.summary().map(function (r) { return '<div class="row small"><span style="width:62px">' + r.name + '</span><div class="bar grow"><i style="width:' + Math.round(r.pct * 100) + '%"></i></div><span class="mute" style="width:118px;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (r.done ? 'Edge reached' : r.stageName) + '</span></div>'; }).join('') + '</button>' : '') +
@@ -680,14 +680,6 @@ var App = (function () {
         '<div class="panel"><span class="eyebrow">Coach’s notes</span>' + ['chess', 'xq', 'poker', 'mkt'].map(function (k) { var r = mods[k] && mods[k].report ? mods[k].report()[0] : null; if (!r) return ''; return '<div class="row" style="align-items:flex-start"><span class="pill" style="min-width:64px;justify-content:center">' + { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets' }[k] + '</span><span class="small grow">' + r.text + '</span></div>'; }).join('') + '<p class="small mute">Each area tracks your mistakes by type and feeds you more of what you miss.</p></div>' +
         '<div class="panel"><span class="eyebrow">Hours toward ' + HOUR_GOAL + ' each</span><div class="list" style="gap:6px">' + [['chess', 'Chess'], ['xq', 'Xiangqi'], ['poker', 'Poker'], ['mkt', 'Markets']].map(function (t) { var h = hoursOf(t[0]); return '<div class="row"><span class="small" style="width:70px">' + t[1] + '</span><div class="bar grow"><i style="width:' + Math.min(100, h / HOUR_GOAL * 100) + '%"></i></div><span class="mono small mute" style="width:52px;text-align:right">' + (h < 1 ? Math.round(h * 60) + 'm' : h.toFixed(1) + 'h') + '</span></div>'; }).join('') + '</div><p class="small mute">Counts time you are actively training. Each track holds roughly 25 hours of structured material, and the bots, puzzles and replays keep going after that.</p></div>' +
         '<div class="panel"><span class="eyebrow">Your levels</span><div class="stats">' + levelStats() + '</div></div>' +
-        (typeof WZ !== 'undefined' ? WZ.card('home') : '') +
-        '<div class="list"><button class="item" id="vc"><span class="grow"><span class="t">Vocabulary</span><br><span class="s">' + (WZ.dueCount() ? WZ.dueCount() + ' word' + (WZ.dueCount() > 1 ? 's' : '') + ' due for review' : 'Words of the realm, a few at a time') + '</span></span><span class="end">' + (WZ.dueCount() ? '<span class="pill acc">review</span>' : '›') + '</span></button><button class="item" id="lib"><span class="grow"><span class="t">Audiobooks</span><br><span class="s">Listen while you train · Libby and hoopla</span></span><span class="end">›</span></button><button class="item" id="thk"><span class="grow"><span class="t">Think outside the box</span><br><span class="s">Creative habits for every game · questions and puzzles</span></span><span class="end">›</span></button><button class="item" id="wz"><span class="grow"><span class="t">Words of wisdom</span><br><span class="s">The metaphors, with their meanings</span></span><span class="end">›</span></button></div>' +
-        '<div class="list">' +
-        item('chess', '&#9822;&#xFE0E;', 'Chess', 'Curriculum, openings, puzzles, coached games') +
-        item('xq', '炮', 'Xiangqi', 'Chinese chess: rules, bot ladder, coached games') +
-        item('poker', '&#9824;&#xFE0E;', 'Poker', 'Hold’em drills and heads-up vs bots') +
-        item('mkt', '↗', 'Markets', 'Trading concepts and chart practice') +
-        '</div>' +
         '<div class="row"><button class="btn sm ghost" id="sess">Session &amp; break settings</button><button class="btn sm ghost" id="bk">Backups</button><button class="btn sm ghost" id="reset">Reset progress</button><button class="btn sm ghost" id="fxt">Celebrations: ' + (S.fx === false ? 'off' : 'on') + '</button><span class="small mute" id="cs">' + (cloudStatus === 'ok' ? 'Progress synced to your account' : cloudStatus === 'err' ? 'Saved on this device only' : 'Saved on this device') + '</span></div>' +
         '<p class="small mute">Market questions are for learning, not investment advice. Practice charts use simulated prices.</p>' +
         '<p class="mute mono" style="font-size:10px;opacity:.6">screen ' + screen.width + '×' + screen.height + ' · view ' + innerWidth + '×' + innerHeight + (window.visualViewport ? ' · vv ' + Math.round(visualViewport.height) : '') + (navigator.standalone ? ' · app' : '') + '</p>';
@@ -700,7 +692,8 @@ var App = (function () {
       if ($('#path', v)) $('#path', v).onclick = RM.home;
       if (QP.active) $('#qpstop', v).onclick = function () { qpStop(); home(); };
       $('#fxt', v).onclick = function () { S.fx = S.fx === false; save(); if (S.fx) celebrate('level'); home(); };
-      $('#vc', v).onclick = WZ.vocab; $('#lib', v).onclick = WZ.library; $('#wz', v).onclick = WZ.wisdomScreen; $('#thk', v).onclick = TH.home;
+      $$('[data-game]', v).forEach(function (b) { b.onclick = function () { ({ vocab: WZ.vocab, think: TH.quiz, books: WZ.library, wisdom: WZ.wisdomScreen, thinkhome: TH.home })[b.dataset.game](); }; });
+      if ($('#qod', v).id === 'qod') $('#qod', v).onclick = function () { var m = $('#qodm', v); m.hidden = !m.hidden; };
       $('#reset', v).onclick = function () {
         modal('<h2>Reset all progress?</h2><p class="mute">Levels, ratings and stats go back to the start. A safety copy is kept under Backups, so you can undo this.</p><div class="btns"><button class="btn" id="no">Keep</button><button class="btn primary" id="yes">Reset</button></div>');
         $('#no').onclick = closeModal;
@@ -723,6 +716,22 @@ var App = (function () {
   function dial(k, glyph, label, stat, pct, han) {
     var R = 25, C = 2 * Math.PI * R, off = C * (1 - Math.max(0.02, Math.min(1, pct)));
     return '<button class="dial" data-go="' + k + '" aria-label="' + label + ', ' + stat + '"><span class="ring"><svg viewBox="0 0 60 60"><circle cx="30" cy="30" r="' + R + '" class="trk"/><circle cx="30" cy="30" r="' + R + '" class="val" stroke-dasharray="' + C.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/></svg><span class="g' + (han ? ' han' : '') + '">' + glyph + '</span></span><span class="dl">' + label + '</span><span class="ds mono">' + stat + '</span></button>';
+  }
+  function quoteHTML() {
+    if (typeof WZ === 'undefined' || !WZ.today) return '';
+    var q = WZ.today();
+    return '<button class="qod" id="qod" aria-label="Quote of the day, tap for its meaning"><span class="eyebrow">Quote of the day</span><span class="qq">“' + esc(q.q) + '”</span><span class="qm small" id="qodm" hidden>' + esc(q.m) + '</span><span class="qh small">Tap for the meaning</span></button>';
+  }
+  function gamesHTML() {
+    var due = 0, tier = 1, mast = 0, th = (S.think || { n: 0, ok: 0 });
+    try { due = WZ.dueCount(); var vs = WZ.vst(); tier = vs.tier || 1; mast = WZ.WORDS.filter(function (w) { return (vs.box[w[0]] || 0) >= 4; }).length; } catch (e) {}
+    function g(key, glyph, name, sub, badge) { return '<button class="game" data-game="' + key + '"><span class="gi">' + glyph + '</span><span class="gn">' + name + '</span><span class="gs">' + sub + '</span>' + (badge ? '<span class="gb">' + badge + '</span>' : '') + '</button>'; }
+    return '<div class="games-h"><h3>Daily games</h3><span class="small mute">Quick rounds that sharpen everything else</span></div><div class="games">' +
+      g('vocab', 'Aa', 'Word Duel', 'Tier ' + tier + ' · ' + mast + ' mastered', due ? due + ' due' : '') +
+      g('think', '?!', 'Outside the Box', th.n ? th.ok + ' of ' + th.n + ' right' : '6 creative questions', '') +
+      g('wisdom', '❝', 'Metaphor Match', 'Lines of life and game', '') +
+      g('books', '♫', 'Audiobooks', 'Listen while you train', '') +
+      '</div>';
   }
   function frontHTML(greet) {
     var path = {}; try { RM.summary().forEach(function (r) { path[r.k] = r.pct; }); } catch (e) {}

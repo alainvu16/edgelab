@@ -113,6 +113,20 @@ p{margin:0}
 .dial:active .ring{transform:scale(.94)}
 .hqp{padding:13px;font-size:17px;display:flex;flex-direction:column;align-items:center;gap:2px;box-shadow:0 8px 24px -10px color-mix(in srgb,var(--accent) 70%,transparent)}
 .hqp span{font:500 12px var(--body);opacity:.85}
+/* quote of the day + daily games */
+.qod{appearance:none;text-align:left;cursor:pointer;width:100%;display:flex;flex-direction:column;gap:6px;padding:14px 16px;border-radius:16px;border:1px solid var(--line);border-left:3px solid var(--accent);background:var(--panel);color:var(--fg)}
+.qod .qq{font-family:var(--display);font-size:15.5px;font-weight:600;line-height:1.35;font-style:italic}
+.qod .qm{color:var(--fg);opacity:.85}
+.qod .qh{color:var(--mute);font-size:11px}
+.qod:has(.qm:not([hidden])) .qh{display:none}
+.games-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:2px}
+.games{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.game{position:relative;appearance:none;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:3px;padding:14px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(160deg,var(--panel2),var(--panel));color:var(--fg);min-width:0}
+.game .gi{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent);font:800 18px var(--display);margin-bottom:6px}
+.game .gn{font:700 15px var(--display)}
+.game .gs{font-size:12px;color:var(--mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.game .gb{position:absolute;top:12px;right:12px;font:700 11px var(--mono);background:var(--accent);color:var(--accent-ink);border-radius:99px;padding:3px 8px}
+.game:active{transform:scale(.98)}
 /* launch mark */
 #splash{position:fixed;inset:0;z-index:100;background:var(--bg);display:grid;place-items:center;animation:spOut .35s ease .95s forwards;pointer-events:none}
 #splash .mk{display:flex;flex-direction:column;align-items:center;gap:14px}
@@ -237,24 +251,24 @@ p{margin:0}
 </div>
 <div id="modal"></div>
 
-<script src="chess.js?v=28"></script>
-<script src="core.js?v=28"></script>
-<script src="content.js?v=28"></script>
-<script src="engine.js?v=28"></script>
-<script src="puzzles.js?v=28"></script>
-<script src="chess-app.js?v=28"></script>
-<script src="xq-engine.js?v=28"></script>
-<script src="xq.js?v=28"></script>
-<script src="poker.js?v=28"></script>
-<script src="mktdata.js?v=28"></script>
-<script src="tapedata.js?v=28"></script>
-<script src="momentum.js?v=28"></script>
-<script src="wisdom.js?v=28"></script>
-<script src="think.js?v=28"></script>
-<script src="macro.js?v=28"></script>
-<script src="tape.js?v=28"></script>
-<script src="markets.js?v=28"></script>
-<script src="roadmap.js?v=28"></script>
+<script src="chess.js?v=29"></script>
+<script src="core.js?v=29"></script>
+<script src="content.js?v=29"></script>
+<script src="engine.js?v=29"></script>
+<script src="puzzles.js?v=29"></script>
+<script src="chess-app.js?v=29"></script>
+<script src="xq-engine.js?v=29"></script>
+<script src="xq.js?v=29"></script>
+<script src="poker.js?v=29"></script>
+<script src="mktdata.js?v=29"></script>
+<script src="tapedata.js?v=29"></script>
+<script src="momentum.js?v=29"></script>
+<script src="wisdom.js?v=29"></script>
+<script src="think.js?v=29"></script>
+<script src="macro.js?v=29"></script>
+<script src="tape.js?v=29"></script>
+<script src="markets.js?v=29"></script>
+<script src="roadmap.js?v=29"></script>
 <script>
 window.addEventListener('error', function (e) {
   try { (window.__errs = window.__errs || []).push(new Date().toISOString().slice(0, 16) + ' ' + (e.message || e) + (e.filename ? ' @' + e.filename.split('/').pop().split('?')[0] + ':' + e.lineno : '')); if (window.__errs.length > 30) window.__errs.shift(); } catch (x) {}
