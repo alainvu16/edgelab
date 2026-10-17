@@ -610,7 +610,16 @@ var App = (function () {
   var idkAt = 0;
   function idkBtn(attr) { return '<button class="btn opt idk" data-' + attr + '="-9">I don’t know</button>'; }
   document.addEventListener('click', function (e) { if (e.target && e.target.closest && e.target.closest('.idk')) idkAt = Date.now(); }, true);
+  // Oct 17: the Home counter counts every graded answer in every game (it used to count only Markets quiz questions)
+  var tallyAt = 0;
+  function tally() {
+    if (!S || Date.now() - tallyAt < 400) return; tallyAt = Date.now();
+    var dk = dayKey(new Date()); if (!S.daily || S.daily.d !== dk) S.daily = { d: dk, n: 0 };
+    S.daily.n++; save();
+  }
+  function answersToday() { return S && S.daily && S.daily.d === dayKey(new Date()) ? S.daily.n : 0; }
   function coachHTML(grade, text, extra) {
+    if (grade && grade !== 'info') tally();
     var g = GRADES[grade] || GRADES.info;
     if (grade === 'wrong' && Date.now() - idkAt < 1500) g = ['ok', 'Here’s how it works'];
     return '<div class="coach ' + g[0] + '" data-g="' + grade + '"><div class="h"><span class="pill ' + g[0] + '">' + g[1] + '</span>' + (extra || '') + '</div><p>' + text + '</p>' + (grade !== 'info' ? '<button class="btn sm ghost simp" type="button">Explain it simpler</button><div class="simpout small" hidden></div>' : '') + '</div>';
@@ -758,14 +767,14 @@ var App = (function () {
   }
   function frontHTML(greet) {
     var path = {}; try { RM.summary().forEach(function (r) { path[r.k] = r.pct; }); } catch (e) {}
-    var m = S.mkt || {}, today = m.today || 0, goal = m.goal || 15, hrs = 0; try { hrs = App.totalHours(); } catch (e) {}
+    var m = S.mkt || {}, today = Math.max(answersToday(), m.day === new Date().toDateString() ? (m.today || 0) : 0), goal = m.goal || 15, hrs = 0; try { hrs = App.totalHours(); } catch (e) {}
     var elo = '—'; try { elo = CZ.estElo().elo; } catch (e) {}
     var xel = 'Lv ' + ((S.xq && S.xq.level) || 1); try { if (XQ.estElo) xel = XQ.estElo().elo; } catch (e) {}
     var sk = streak(), streakChip = '<span class="hchip">' + (sk >= 2 ? sk + '-day streak' : 'Day one') + '</span>';
     return '<section class="hero">' +
       '<div class="hrow"><span class="eyebrow">' + greet + ', Alain</span>' + streakChip + '</div>' +
       '<h1 class="htitle">Train your <span>edge</span>.</h1>' +
-      '<p class="hsub mono">' + (today >= goal ? Math.min(today, 999) + ' questions · goal hit · ' : today + '/' + goal + ' questions today · ') + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
+      '<p class="hsub mono">' + (today >= goal ? Math.min(today, 999) + ' answers today · goal hit · ' : today + '/' + goal + ' answers today · ') + (hrs < 1 ? Math.round(hrs * 60) + ' min' : hrs.toFixed(1) + ' h') + ' trained</p>' + sparkPath() +
       '<div class="dials">' +
         dial('mkt', '↗', 'Markets', 'Lv ' + (m.level || 1), path.mkt || 0) +
         dial('chess', '&#9822;&#xFE0E;', 'Chess', elo, path.chess || 0) +
