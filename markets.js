@@ -290,6 +290,7 @@ var MK = (function () {
         '<div class="panel"><div class="row"><h3 class="grow">Today: ' + m.today + ' / ' + m.goal + ' questions</h3>' + (m.today >= m.goal ? '<span class="pill good">Goal hit</span>' : '') + '</div><div class="bar"><i style="width:' + Math.min(100, m.today / m.goal * 100) + '%;background:var(--good)"></i></div></div>' +
         (function () { var r = report()[0]; return '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + r.text + '</p><button class="btn sm" id="repgo">' + r.action + ' ›</button></div>'; })() +
         '<div class="btns"><button class="btn primary" id="go">Keep learning</button><button class="btn" id="rp">Rapid fire</button><button class="btn" id="sm">Chart practice</button></div>' +
+        (typeof TB !== 'undefined' ? '<button class="item" id="tbs" style="border-color:var(--accent)"><span class="grow"><span class="t">ToneBot School</span><br><span class="s">' + (TB.count() ? 'Learn your own bot: ' + TB.done() + ' of ' + TB.count() + ' lessons · Rotation Replay · beat its daily call' : 'Learn your own bot · private, loads from your GitHub backup') + '</span></span><span class="end">›</span></button>' : '') +
         '<div class="list"><button class="item" id="mo"><span class="grow"><span class="t">Momentum Lab</span><br><span class="s">Sector rotation course + replay on real data 2013–' + MKT_DATA.asof.slice(0, 4) + '</span></span><span class="end">›</span></button>' +
         '<button class="item" id="mc"><span class="grow"><span class="t">Macro Desk</span><br><span class="s">How world events reach prices · real episodes</span></span><span class="end">›</span></button>' +
         '<button class="item" id="tp"><span class="grow"><span class="t">Tape School</span><br><span class="s">What forces what, measured · read real months · research list</span></span><span class="end">›</span></button>' +
@@ -304,7 +305,7 @@ var MK = (function () {
       $('#rp', v).onclick = rapid;
       $('#repgo', v).onclick = report()[0].go;
       $('#sm', v).onclick = simScreen;
-      $('#mo', v).onclick = MO.home; $('#mc', v).onclick = MC.home; $('#tp', v).onclick = TP.home; $('#sl', v).onclick = TP.strategies;
+      if (typeof TB !== 'undefined') $('#tbs', v).onclick = TB.home; $('#mo', v).onclick = MO.home; $('#mc', v).onclick = MC.home; $('#tp', v).onclick = TP.home; $('#sl', v).onclick = TP.strategies;
     });
   }
   function rapid() {

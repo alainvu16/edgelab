@@ -147,6 +147,14 @@ var App = (function () {
       body: body ? JSON.stringify(body) : undefined
     });
   }
+  // read any JSON file from the private backup repo (used by ToneBot School); null when not connected or missing
+  function ghGetJSON(path) {
+    var c = GH.cfg; if (!c || !c.token || !c.repo || !navigator.onLine) return Promise.resolve(null);
+    return fetch('https://api.github.com/repos/' + c.repo + '/contents/' + path, { cache: 'no-store', headers: { 'Authorization': 'Bearer ' + c.token, 'Accept': 'application/vnd.github+json' } })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { return j && j.content ? JSON.parse(unb64(j.content)) : null; })
+      .catch(function () { return null; });
+  }
   function deviceInfo() {
     var vv = window.visualViewport;
     return { screen: window.screen.width + 'x' + window.screen.height, view: innerWidth + 'x' + innerHeight, vv: vv ? Math.round(vv.width) + 'x' + Math.round(vv.height) : '', app: !!navigator.standalone,
@@ -817,7 +825,7 @@ var App = (function () {
   }
 
   return {
-    backupScreen: backupScreen, idkBtn: idkBtn, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
+    backupScreen: backupScreen, idkBtn: idkBtn, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
     st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
