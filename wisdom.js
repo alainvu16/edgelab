@@ -55,7 +55,7 @@ var WZ = (function () {
   };
   (function () { var ex = App.X().wisdom || {}; var ex2 = App.X().wisdom2 || {}; Object.keys(ex2).forEach(function (k) { ex[k] = (ex[k] || []).concat(ex2[k]); }); Object.keys(ex).forEach(function (k) { if (LINES[k]) ex[k].forEach(function (q) { LINES[k].push(q); }); }); })();
   var ALLQ = []; Object.keys(LINES).forEach(function (k) { LINES[k].forEach(function (q) { ALLQ.push({ k: k, q: q[0], m: q[1] }); }); });
-  function dayIndex() { return Math.floor(Date.now() / 86400e3); }
+  function dayIndex() { return Math.floor((Date.now() - new Date().getTimezoneOffset() * 60000) / 86400e3); } // changes at your local midnight
   // The day's line repeats all day so it sinks in; other moments draw at random.
   function pickQ(kind) {
     if (kind === 'home') return ALLQ[dayIndex() % ALLQ.length];
