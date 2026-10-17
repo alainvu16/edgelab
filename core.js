@@ -462,7 +462,7 @@ var App = (function () {
       var score = (1 - Math.min(1, Math.max(0, prog[k]))) * 0.8 + Math.min(1, sev) * 0.8 - (QP.blocks[k] || 0) * 0.45 - hoursOf(k) / HOUR_GOAL * 0.3 + Math.random() * 0.35;
       if (!best || score > best.score) best = { k: k, score: score };
     });
-    if (typeof RM !== 'undefined' && Math.random() < 0.5) { try { var ns = RM.nextStep(best.k); if (ns && ns.label !== QP.lastLabel) return { k: best.k, label: ns.label, why: 'Next step on your path to an edge.', go: ns.go, quota: 3 }; } catch (e) {} }
+    /* Oct 17: learn in order — 8 of 10 picks are the next step on the path, the rest is variety */ if (typeof RM !== 'undefined' && Math.random() < 0.8) { try { var ns = RM.nextStep(best.k); if (ns && ns.label !== QP.lastLabel) return { k: best.k, label: ns.label, why: 'Next step on your path to an edge.', go: ns.go, quota: 3 }; } catch (e) {} }
     var list = mods[best.k].quick().filter(function (a) { return a.label !== QP.lastLabel; });
     var tot = list.reduce(function (s, a) { return s + (a.w || 1); }, 0), r = Math.random() * tot, a = list[0];
     for (var i = 0; i < list.length; i++) { r -= (list[i].w || 1); if (r <= 0) { a = list[i]; break; } }

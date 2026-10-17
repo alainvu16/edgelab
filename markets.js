@@ -379,6 +379,7 @@ var MK = (function () {
     if (typeof TP !== 'undefined') out.push({ label: 'Read the month (real data)', why: 'See the forces, call the leader, check against reality.', go: TP.readMonth, quota: 4, w: 1.3 });
     if (typeof MO !== 'undefined') out.push({ label: 'Rotation Replay', why: 'Pick what the 12-1 rule holds on a real month.', go: MO.replay, quota: 4, w: 1.2 });
     if (typeof MC !== 'undefined' && MC.eventReplay) out.push({ label: 'Event Replay', why: 'Real market episodes, real outcomes.', go: MC.eventReplay, quota: 3, w: 1 });
+    if (typeof TB !== 'undefined' && TB.hasQuiz()) out.push({ label: 'ToneBot course questions', why: 'The bot’s own course, in order; misses come back as a second look.', go: function () { TB.courseQuiz(''); }, quota: 1, w: 1.2 });
     out.push({ label: 'Rapid fire', why: 'Speed round; the clock shrinks as your streak grows.', go: rapid, quota: 1, w: .7 });
     return out;
   }

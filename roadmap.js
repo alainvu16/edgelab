@@ -6,6 +6,9 @@ var RM = (function () {
   function rm() { var s = S(); if (!s.rm) s.rm = { self: {} }; return s.rm; }
   function cnt(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }).length; }
   function frac(v, goal) { return Math.max(0, Math.min(1, (v || 0) / goal)); }
+  // ToneBot course steps (Oct 17): the bot's own course questions, placed where they fit the order you learn in. No data yet = not a blocker.
+  function tbStep(label, start, why) { return { label: label, why: why, p: function () { if (typeof TB === 'undefined' || !TB.hasQuiz()) return 1; var x = TB.courseProgress(start); return x == null ? 1 : x; }, go: function () { TB.courseQuiz(start); } }; }
+  function tbSchool() { return { label: 'ToneBot School: all 11 lessons', why: 'The bot you built, from its own lab results.', p: function () { var x = typeof TB !== 'undefined' ? TB.lessonsDone() : null; return x == null ? 1 : x; }, go: function () { TB.nextLesson(); } }; }
   function selfStep(id, label, why) { return { id: id, label: label, why: why, self: true, p: function () { return rm().self[id] ? 1 : 0; } }; }
 
   var TRACKS = {
@@ -15,24 +18,29 @@ var RM = (function () {
           { label: 'Reach Markets level 3', p: function () { return frac((S().mkt.level || 1) - 1, 2); }, go: function () { MK.learn(); } },
           { label: 'Risk skill 2.5+ (position sizing, drawdowns)', p: function () { return frac((S().mkt.topic || {}).Risk - 1, 1.5); }, go: function () { MK.learn(); } },
           { label: 'Orders and basics skill 2.5+', p: function () { var t = S().mkt.topic || {}; return (frac((t.Orders || 1) - 1, 1.5) + frac((t.Basics || 1) - 1, 1.5)) / 2; }, go: function () { MK.learn(); } },
-          { label: 'Charts skill 2.5+ (trend, support, volume)', p: function () { return frac(((S().mkt.topic || {}).Charts || 1) - 1, 1.5); }, go: function () { MK.learn(); } }
+          { label: 'Charts skill 2.5+ (trend, support, volume)', p: function () { return frac(((S().mkt.topic || {}).Charts || 1) - 1, 1.5); }, go: function () { MK.learn(); } },
+          tbStep('ToneBot course: The stock market', 'The stock market', 'Stocks, ETFs, sectors and indexes — the things the bot trades.')
         ] },
         { t: 'How markets move', why: 'What forces what: rates, the dollar, oil, fear and earnings. This is reading the tape.', steps: [
           { label: 'Tape School: all 8 lessons', p: function () { return frac(cnt(((S().mkt.tp) || {}).lesson), 8); }, go: function () { TP.home(); } },
           { label: 'Macro Desk: all chains', p: function () { return frac(cnt(((S().mkt.mc) || {}).lesson), MC.CHAINS.length); }, go: function () { MC.home(); } },
           { label: 'Read 15 real months (60%+ right)', p: function () { var t = S().mkt.tp || {}; return Math.min(frac(t.reads, 15), t.reads ? frac(t.right / t.reads, 0.6) : 0); }, go: function () { TP.readMonth(); } },
-          { label: 'Call 12 historical events', p: function () { return frac(((S().mkt.mc) || {}).total, 12); }, go: function () { MC.eventReplay(); } }
+          { label: 'Call 12 historical events', p: function () { return frac(((S().mkt.mc) || {}).total, 12); }, go: function () { MC.eventReplay(); } },
+          tbStep('ToneBot course: Your bot', 'Your bot', 'Every rule in ToneBot, one idea at a time (🧪 untested: how it trades, not proof it wins).')
         ] },
         { t: 'Strategy', why: 'Momentum and sector rotation: rules, backtests, and why each strategy wins and fails.', steps: [
           { label: 'Momentum Lab: all lessons', p: function () { return frac(cnt(((S().mkt.mo) || {}).lesson), MO.LESSONS.length); }, go: function () { MO.home(); } },
           { label: 'Strategy lab: all 9 strategies checked', p: function () { return frac(cnt(((S().mkt.tp) || {}).strat), 9); }, go: function () { TP.strategies(); } },
           { label: 'Rotation Replay level 3', p: function () { return frac((((S().mkt.mo) || {}).lv || 1) - 1, 2); }, go: function () { MO.replay(); } },
+          tbSchool(),
           { label: 'Momentum & Systems skill 3.5+', p: function () { var t = S().mkt.topic || {}; return (frac((t.Momentum || 1) - 1, 2.5) + frac((t['Systems & backtesting'] || 1) - 1, 2.5)) / 2; }, go: function () { MK.learn(); } },
           { label: 'Chart practice: net positive over 20 charts', p: function () { var m = S().mkt; return m.simN >= 20 && m.simR > 0 ? 1 : frac(m.simN, 20) * 0.9; }, go: function () { MK.sim(); } }
         ] },
         { t: 'Build your edge', why: 'Write your rules, paper trade them for 12 weeks, compare with the backtest, then go small with real money only if they hold.', steps: [
           { label: 'Write your trading system', why: 'Universe, signal, filter, rebalance, size, exit. Every field filled.', p: function () { var y = S().mkt.system || {}; return frac(SYS.filter(function (f) { return (y[f[0]] || '').trim().length > 3; }).length, SYS.length); }, go: system },
           { label: 'Paper trade 12 weekly journal entries', why: 'Log what the rules say and what you did, every week (Market Now journal).', p: function () { return frac((S().mkt.journal || []).length, 12); }, go: function () { MO.now(); } },
+          tbStep('ToneBot course: How ToneBot is built', 'How ToneBot is built', 'Tech meets trading: data, tests, servers, guardrails.'),
+          tbStep('ToneBot course: Uncle school', 'Uncle school', 'His strategy, tested (🧪 still in the lab).'),
           selfStep('mkt_review', 'Compare paper results with the backtest', 'Same rules, similar results? If not, find out why before risking money.'),
           selfStep('mkt_small', 'Go live small: risk 1% or less per position', 'Only after the paper results hold. Size so a full losing streak is survivable.')
         ] }
@@ -143,7 +151,8 @@ var RM = (function () {
     var d = st.hoursLeft / st.perDay, when = new Date(Date.now() + d * 864e5);
     return { hours: st.hoursLeft, days: Math.ceil(d), date: when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
   }
-  function nextStep(k) { if (!TRACKS[k]) return null; var st = trackStats(k); return st.next.filter(function (s) { return s.go; })[0] || null; }
+  // Oct 17 ('mixed like a salad, but in order'): stages stay in order; inside the current stage, rotate among its next open steps
+  function nextStep(k) { if (!TRACKS[k]) return null; var st = trackStats(k), cur = st.done ? [] : TRACKS[k].stages[st.stage].steps.filter(function (s) { return s.go && s._p < 1; }), open = cur.length ? cur : st.next.filter(function (s) { return s.go; }); return open.length ? open[Math.floor(Math.random() * open.length)] : null; }
   var ORDER = ['mkt', 'chess', 'poker', 'xq'];
   function card(k) {
     var tr = TRACKS[k], st = trackStats(k), e = eta(st);
@@ -157,7 +166,7 @@ var RM = (function () {
       v.innerHTML = '<div><span class="eyebrow">Start to finish</span><h1>Your path to an edge</h1><p class="mute small">Each track goes Basics → Fundamentals → Strategy → Your edge. Every step is tied to something you actually do in the app, so progress is earned, not clicked. Time estimates use your real pace once you have about an hour in a track.</p></div>' +
         '<div class="stats"><div class="stat"><span class="v">' + tot.toFixed(1) + 'h</span><span class="k">Trained</span></div><div class="stat"><span class="v">' + days + '</span><span class="k">Active days</span></div><div class="stat"><span class="v">' + (days >= 2 ? Math.round(tot / days * 60) + 'm' : '—') + '</span><span class="k">Per day</span></div></div>' +
         '<div class="list">' + ORDER.map(card).join('') + '</div>' +
-        App.coachHTML('info', 'Quick play follows these paths automatically: about half of its picks are your next roadmap step. Trading gets the most detail because that is where an edge pays the most, and where most people skip the boring parts.');
+        App.coachHTML('info', 'Quick play follows these paths automatically: most of its picks are your next step in order, mixed across subjects, with word reviews and outside-the-box questions in between. Trading gets the most detail because that is where an edge pays the most, and where most people skip the boring parts.');
       $$('[data-tr]', v).forEach(function (b) { b.onclick = function () { track(b.dataset.tr); }; });
     });
   }
