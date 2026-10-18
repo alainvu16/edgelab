@@ -430,7 +430,7 @@ var App = (function () {
       '<div class="btns">' + opts.map(function (m) { return '<button class="btn' + (ss.active && ss.limit === m ? ' primary' : '') + '" data-m="' + m + '">' + m + ' min</button>'; }).join('') + '</div>' +
       '<h3>Market breaks</h3><p class="mute small">A short trading quiz after every stretch of play.</p>' +
       '<div class="seg" id="bev">' + [8, 12, 20, 0].map(function (m) { return '<button aria-pressed="' + (S.breakEvery === m) + '" data-b="' + m + '">' + (m ? 'Every ' + m + ' min' : 'Off') + '</button>'; }).join('') + '</div>' +
-      '<h3>Look</h3><div class="seg" id="skn">' + [['classic', 'Classic'], ['future', 'Mission console']].map(function (o) { return '<button aria-pressed="' + ((S.skin || 'classic') === o[0]) + '" data-look="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div>' +
+      '<h3>Look</h3><div class="seg" id="skn">' + [['classic', 'Classic'], ['future', 'Mission console']].map(function (o) { return '<button aria-pressed="' + ((S.skin || 'future') === o[0]) + '" data-look="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div>' +
       '<h3>Full-day nudge</h3><p class="mute small">In quick play, once a day after this many answers, a suggestion to stop for the day.</p>' +
       '<div class="seg" id="fdn">' + [120, 180, 250, 0].map(function (m) { var cur = S.fullDay == null ? 180 : S.fullDay; return '<button aria-pressed="' + (cur === m) + '" data-fd="' + m + '">' + (m ? m + ' answers' : 'Off') + '</button>'; }).join('') + '</div>' +
       (sampleFn ? '<h3>Explain like I’m 5</h3><div class="seg" id="simps">' + [['off', 'Button only'], ['wrong', 'When I’m wrong'], ['always', 'Always']].map(function (o) { return '<button aria-pressed="' + ((S.simple || 'wrong') === o[0]) + '" data-sm="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><p class="mute small">Rewrites coach notes in kid-simple words using Claude (needs a connection).</p>' : '') +
@@ -933,7 +933,7 @@ var App = (function () {
   }
 
   // Look: 'classic' (default) or 'future' (mission console, future.css). Saved with progress.
-  function applySkin() { var k = S && S.skin === 'future' ? 'future' : ''; if (k) document.documentElement.setAttribute('data-skin', k); else document.documentElement.removeAttribute('data-skin'); var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', k ? '#0a0f2e' : '#11141c'); }
+  function applySkin() { var k = S && S.skin !== 'classic' ? 'future' : ''; /* Mission console is the default; Classic is one tap away */ if (k) document.documentElement.setAttribute('data-skin', k); else document.documentElement.removeAttribute('data-skin'); var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', k ? '#0a0f2e' : '#11141c'); }
   function boot() {
     getWorker();
     setTimeout(cloudInit, 0);
