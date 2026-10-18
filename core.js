@@ -556,7 +556,18 @@ var App = (function () {
     var on = QP.active && QP.only === k;
     return '<button class="btn primary hqp" id="playnow">' + (on ? 'Keep playing' : 'Play now') + '<span>' + (on ? qname(k) + ' only · keeps going until you stop' : 'Picks your next step and keeps going until you stop') + '</span></button>';
   }
-  function wirePlayNow(v, k) { var b = $('#playnow', v); if (b) b.onclick = function () { if (QP.active && QP.only === k) qpNext(); else playNow(k); }; }
+  function wirePlayNow(v, k) { var b = $('#playnow', v); if (b) b.onclick = function () { if (QP.active && QP.only === k) qpNext(); else playNow(k); }; foldRest(v, k); }
+  // Oct 18: each section shows header, Play now and the coach; everything else folds under "Pick it myself" (open state remembered per section)
+  function foldRest(v, k) {
+    var c = $('#playnow', v); if (!c || c.parentNode !== v) return;
+    var coach = c.nextElementSibling; while (coach && !coach.classList.contains('coach')) coach = coach.nextElementSibling;
+    var from = (coach || c).nextElementSibling; if (!from) return;
+    var d = document.createElement('details'); d.className = 'panel more pickself'; S.pickOpen = S.pickOpen || {}; if (S.pickOpen[k]) d.open = true;
+    d.innerHTML = '<summary class="eyebrow" style="cursor:pointer">Pick it myself</summary>';
+    v.insertBefore(d, from);
+    while (d.nextSibling) d.appendChild(d.nextSibling);
+    d.addEventListener('toggle', function () { S.pickOpen[k] = d.open ? 1 : 0; save(); });
+  }
   function qpNext() { qpLaunch(qpPick()); }
   function edgeCheck() { closeModal(); QP.only = null; S.qpOnly = null; if (QP.active) { QP.edge = 4; qpNext(); } else quickPlay(true); }
   function qpStop() { QP.active = false; QP.only = null; S.qpOnly = null; FADE.run = 0; S.qpOn = 0; save(); closeModal(); toast('Quick play stopped'); header(stack.length ? stack[stack.length - 1].title : 'Home', stack.length > 1); }
