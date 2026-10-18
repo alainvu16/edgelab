@@ -45,7 +45,7 @@ var TH = (function () {
   }
   function quiz() {
     App.screen('Creative questions', function (v) {
-      var n = 0, right = 0, N = 6, pool = Q.slice().sort(function () { return Math.random() - .5; });
+      var n = 0, right = 0, N = 6, pool = Q.slice().sort(function (a, b) { return (App.recentHas('think', a[1].slice(0, 40)) - App.recentHas('think', b[1].slice(0, 40))) || Math.random() - .5; }); // Oct 18: unseen first
       function ask() {
         if (n >= N) {
           v.innerHTML = '<div class="panel"><h2>' + right + ' / ' + N + '</h2><p>' + (right >= 5 ? 'Sharp. Now use one of these habits in your next game.' : 'Reread the principles; then try again. The questions reshuffle.') + '</p><div class="btns"><button class="btn primary" id="ag">Another round</button><button class="btn" id="dn">Done</button></div></div>' + (typeof WZ !== 'undefined' ? WZ.card('home', true) : '');
@@ -53,7 +53,7 @@ var TH = (function () {
           $('#dn', v).onclick = function () { App.checkpoint(App.back); };
           return;
         }
-        var q = pool[n % pool.length], order = [0, 1, 2, 3].sort(function () { return Math.random() - .5; }), done = false;
+        var q = pool[n % pool.length]; App.recentAdd('think', q[1].slice(0, 40), 14); var order = [0, 1, 2, 3].sort(function () { return Math.random() - .5; }), done = false;
         v.innerHTML = '<div class="row"><span class="pill acc">' + (n + 1) + ' / ' + N + '</span><span class="pill">' + { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets', all: 'All games' }[q[0]] + '</span></div><h2>' + esc(q[1]) + '</h2><div class="list">' + order.map(function (k) { return '<button class="btn opt" data-k="' + k + '">' + esc(q[2][k]) + '</button>'; }).join('') + App.idkBtn('k') + '</div><div id="fb"></div>';
         $$('[data-k]', v).forEach(function (b) {
           b.onclick = function () {

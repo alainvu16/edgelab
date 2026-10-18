@@ -510,7 +510,7 @@ var App = (function () {
     var due = (typeof WZ !== 'undefined') ? WZ.dueCount() : 0;
     if (QP.n > 0 && QP.n % 4 === 3 && due >= 2 && QP.last !== 'vocab') return { k: 'vocab', label: 'Vocabulary review', why: due + ' words are due before they fade.', go: function () { WZ.vocab(); }, quota: 1 };
     // jargon: the words you tapped or missed get drilled for real, in the area you're training most
-    if (QP.n > 0 && QP.n % 3 === 2 && QP.last !== 'words' && typeof GL !== 'undefined' && (GL.dueCount() > 0 || QP.n % 6 === 2)) { var ga = Math.floor(QP.n / 3) % 2 ? 'Everyday' : ({ poker: 'Poker', mkt: 'Trading', chess: 'Chess', xq: 'Xiangqi' }[QP.lastK] || 'Poker'); /* every other words slot: everyday vocabulary */ return { k: 'words', label: 'Words to Know: ' + ga, why: GL.dueCount() ? GL.dueCount() + ' words you tapped or missed, drilled until they stick.' : (ga === 'Everyday' ? 'Sophisticated everyday words: 10 quick ones.' : 'Learn the language of the game: 10 quick words.'), go: function () { GL.drill(ga); }, quota: 1 }; }
+    if (QP.n > 0 && QP.n % 3 === 2 && QP.last !== 'words' && typeof GL !== 'undefined' && (GL.dueCount() > 0 || QP.n % 6 === 2)) { var ga = Math.floor(QP.n / 3) % 2 ? 'Everyday' : ({ poker: 'Poker', mkt: 'Trading', chess: 'Chess', xq: 'Xiangqi' }[QP.lastK] || 'Poker'); /* every other words slot: everyday vocabulary */ if (GL.left && GL.left(ga) === 0) { /* Oct 18: area fully mastered → the area with the most words still to learn */ ga = ['Poker', 'Trading', 'Chess', 'Xiangqi', 'Everyday'].sort(function (x, y) { return GL.left(y) - GL.left(x); })[0]; } return { k: 'words', label: 'Words to Know: ' + ga, why: GL.dueCount() ? GL.dueCount() + ' words you tapped or missed, drilled until they stick.' : (ga === 'Everyday' ? 'Sophisticated everyday words: 10 quick ones.' : 'Learn the language of the game: 10 quick words.'), go: function () { GL.drill(ga); }, quota: 1 }; }
     // street smarts (real situations, learn by doing): every 6th block
     if (QP.n > 0 && QP.n % 6 === 3 && QP.last !== 'street' && typeof ST !== 'undefined' && ST.ALL.length) return { k: 'street', label: 'Street Smarts', why: 'Real situations: negotiating, scams, people and thinking traps. You choose, then the why.', go: ST.quiz, quota: 1 };
     // quick mental math (stocks + everyday): every 5th block
@@ -525,8 +525,8 @@ var App = (function () {
       var score = (1 - Math.min(1, Math.max(0, prog[k]))) * 0.8 + Math.min(1, sev) * 0.8 - (QP.blocks[k] || 0) * 0.45 - hoursOf(k) / HOUR_GOAL * 0.3 + Math.random() * 0.35;
       if (!best || score > best.score) best = { k: k, score: score };
     });
-    /* Oct 17: learn in order — 8 of 10 picks are the next step on the path, the rest is variety */ if (typeof RM !== 'undefined' && Math.random() < 0.8) { try { var ns = RM.nextStep(best.k); if (ns && ns.label !== QP.lastLabel) return { k: best.k, label: ns.label, why: 'Next step on your path to an edge.', go: ns.go, quota: 3 }; } catch (e) {} }
-    var a = weighted(mods[best.k].quick().filter(function (a) { return a.label !== QP.lastLabel; }));
+    /* Oct 17: learn in order — 8 of 10 picks are the next step on the path, the rest is variety */ if (typeof RM !== 'undefined' && Math.random() < 0.8) { try { var ns = RM.nextStep(best.k); if (ns && !recentHas('qpLabel', ns.label)) return { k: best.k, label: ns.label, why: 'Next step on your path to an edge.', go: ns.go, quota: 3 }; } catch (e) {} }
+    var bl = mods[best.k].quick(), bf = bl.filter(function (a) { return !recentHas('qpLabel', a.label); }), a = weighted(bf.length ? bf : bl);
     a.k = best.k; return a;
   }
   // weighted random pick from a subject's quick() list (w = weight, default 1)
@@ -537,12 +537,12 @@ var App = (function () {
   }
   // Play now inside one section (Oct 18): stays in that subject, mostly the next step on its path, the rest from its own mix
   function sectionPick(k) {
-    if (typeof RM !== 'undefined' && Math.random() < 0.6) { try { var ns = RM.nextStep(k); if (ns && ns.label !== QP.lastLabel) return { k: k, label: ns.label, why: 'Next step on your ' + qname(k) + ' path.', go: ns.go, quota: 3 }; } catch (e) {} }
-    var all = mods[k].quick(), list = all.filter(function (a) { return a.label !== QP.lastLabel; });
+    if (typeof RM !== 'undefined' && Math.random() < 0.6) { try { var ns = RM.nextStep(k); if (ns && !recentHas('qpLabel', ns.label)) return { k: k, label: ns.label, why: 'Next step on your ' + qname(k) + ' path.', go: ns.go, quota: 3 }; } catch (e) {} }
+    var all = mods[k].quick(), list = all.filter(function (a) { return !recentHas('qpLabel', a.label); });
     var a = weighted(list.length ? list : all); a.k = k; return a;
   }
   function qpLaunch(a) {
-    if (['poker', 'mkt', 'chess', 'xq'].indexOf(a.k) >= 0) QP.lastK = a.k; QP.last = a.k; QP.lastLabel = a.label; QP.count = 0; QP.quota = a.quota || 1; QP.start = Date.now(); QP.n++;
+    if (['poker', 'mkt', 'chess', 'xq'].indexOf(a.k) >= 0) QP.lastK = a.k; QP.last = a.k; QP.lastLabel = a.label; recentAdd('qpLabel', a.label, 4); QP.count = 0; QP.quota = a.quota || 1; QP.start = Date.now(); QP.n++;
     QP.blocks[a.k] = (QP.blocks[a.k] || 0) + 1; QP.cur = a;
     if (a.edge) QP.edge = Math.max(0, (QP.edge || 0) - 1);
     closeModal();
@@ -746,6 +746,19 @@ var App = (function () {
   var subjOver = '';
   function coachFor(k, grade, text, extra) { subjOver = k; try { return coachHTML(grade, text, extra); } finally { subjOver = ''; } } // pop-ups grade into their own subject
   function subjNow() { if (subjOver) return subjOver; var top = stack[stack.length - 1]; if (top && top.subj) return top.subj; if (['chess', 'xq', 'poker', 'mkt'].indexOf(curTab) >= 0) return curTab; return top ? SUBJ_BY_TITLE[top.title] || '' : ''; }
+  // Oct 18 "better shuffle, tons of repeats": one anti-repeat memory for every question source, saved with progress.
+  // S.recent[key] = the last ids asked from that source; freshPick() skips them until the pool runs low.
+  function recentHas(key, id) { var r = S.recent && S.recent[key]; return !!r && r.indexOf(id) >= 0; }
+  function recentAdd(key, id, max) {
+    S.recent = S.recent || {}; var r = S.recent[key] = (S.recent[key] || []).filter(function (x) { return x !== id; });
+    r.push(id); if (r.length > (max || 40)) r.splice(0, r.length - (max || 40));
+  }
+  function freshPick(key, list, idOf, max) { // random item not asked lately; remembers up to ~70% of the pool (capped at max)
+    if (!list.length) return null;
+    var cap = Math.max(1, Math.min(max || 60, Math.floor(list.length * 0.7))), pool = list.filter(function (x) { return !recentHas(key, String(idOf(x))); });
+    if (!pool.length) pool = list;
+    var x = pool[Math.floor(Math.random() * pool.length)]; recentAdd(key, String(idOf(x)), cap); return x;
+  }
   function answersToday() { return S && S.daily && S.daily.d === dayKey(new Date()) ? S.daily.n : 0; }
   function coachHTML(grade, text, extra) {
     var counted = grade && grade !== 'info' && tally();
@@ -992,7 +1005,7 @@ var App = (function () {
   }
 
   return {
-    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
+    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, freshPick: freshPick, recentHas: recentHas, recentAdd: recentAdd, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
     st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, playNow: playNow, playNowBtn: playNowBtn, wirePlayNow: wirePlayNow, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }

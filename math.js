@@ -127,7 +127,7 @@ var MM = (function () {
         steps: steps, trick: 'Split the bigger number into tens and ones, multiply each, then add.', use: 'Fast estimates of position value, pot sizes and totals without reaching for the phone calculator.' });
     },
     sq: function (lv) {
-      var a = lv < 3 ? pick([15, 25, 35, 45, 55, 65]) : R(21, 79), p = a * a, r = Math.round(a / 10) * 10, d = a - r, t = Math.floor(a / 10);
+      var a = lv < 3 ? pick([11, 12, 13, 14, 15, 16, 19, 21, 25, 31, 35, 45, 49, 51, 55, 65, 75, 85, 95]) : R(21, 79), p = a * a, r = Math.round(a / 10) * 10, d = a - r, t = Math.floor(a / 10);
       var steps = a % 10 === 5 ? ['1) Take the tens digit (' + t + ') times the next number (' + (t + 1) + '): ' + t * (t + 1) + '.', '2) Write 25 after it: ' + p + '.']
         : ['1) Round to ' + r + ' (' + (d > 0 ? '+' : '−') + Math.abs(d) + ').', '2) (a ± b)² = a² ± 2ab + b²: ' + r * r + ' ' + (d > 0 ? '+' : '−') + ' ' + 2 * r * Math.abs(d) + ' + ' + d * d + '.', '3) = ' + p + '.'];
       return done({ q: a + '² = ?', o: choices(p, [[a * 20, 'That’s ' + a + ' × 20, not ' + a + ' × ' + a + '.'], [p + 10, 'Off by 10: check the middle step.'], [p - 10, 'Off by 10: check the middle step.']], num, [p + 100, p - 100]),
@@ -147,21 +147,25 @@ var MM = (function () {
         trick: 'Divide in chunks of 10 × the divisor, then check by multiplying back: ' + q + ' × ' + b + ' = ' + a + '.', use: 'Splitting costs, per-share numbers and pot odds.' });
     },
     frac: function (lv) {
-      var f = pick(lv < 3 ? [[1, 4], [3, 4], [1, 5], [2, 5], [1, 8], [3, 8]] : [[1, 3], [2, 3], [1, 6], [5, 8], [7, 8], [1, 12], [3, 16]]), x = f[0] / f[1] * 100, unit = 100 / f[1];
+      var f = pick(lv < 3 ? [[1, 4], [3, 4], [1, 5], [2, 5], [3, 5], [4, 5], [1, 8], [3, 8], [5, 8], [7, 8], [1, 20], [3, 20], [7, 20], [1, 25], [3, 10], [7, 10]] : [[1, 3], [2, 3], [1, 6], [5, 6], [5, 8], [7, 8], [1, 12], [5, 12], [3, 16], [5, 16], [1, 40], [9, 40], [1, 7], [1, 9]]), x = f[0] / f[1] * 100, unit = 100 / f[1];
       return done({ q: f[0] + '/' + f[1] + ' as a percent?', o: choices(x, [[100 - x, 'That’s the other part: ' + (f[1] - f[0]) + '/' + f[1] + '.'], [f[1] / f[0], 'You divided the wrong way round.'], [x / 10, 'Decimal slip: off by a factor of 10.']], function (v) { return r1(v) + '%'; }),
         steps: ['1) 1/' + f[1] + ' of 100% = ' + r1(unit) + '%.', '2) ' + f[0] + ' of those = ' + f[0] + ' × ' + r1(unit) + '% = ' + r1(x) + '%.'],
         trick: 'Learn the base ones by heart: 1/8 = 12.5%, 1/6 ≈ 16.7%, 1/3 ≈ 33.3%, 1/12 ≈ 8.3%. Everything else is a multiple.',
         use: 'Poker odds and win rates come as fractions (“1 in 4”); converting fast lets you compare them to the price.' });
     },
     tip: function (lv) {
-      var bill = pick([42, 64, 86, 120, 148, 236]), p = pick([15, 18, 20]), t = bill * p / 100, ten = bill / 10;
-      var steps = p === 20 ? ['1) 10% of ' + money(bill) + ' = ' + money(ten) + '.', '2) 20% = double: ' + money(ten * 2) + '.'] : p === 15 ? ['1) 10% = ' + money(ten) + '.', '2) 5% = half of that: ' + money(ten / 2) + '.', '3) 15% = ' + money(ten) + ' + ' + money(ten / 2) + ' = ' + money(t) + '.'] : ['1) 10% = ' + money(ten) + ', so 20% = ' + money(ten * 2) + '.', '2) 2% = ' + money(ten / 5) + '.', '3) 18% = 20% − 2% = ' + money(t) + '.'];
+      var bill = pick([24, 36, 42, 48, 56, 64, 72, 86, 94, 120, 132, 148, 164, 186, 212, 236, 280, 340]), p = pick([15, 18, 20, 25]), t = bill * p / 100, ten = bill / 10;
+      var steps = p === 25 ? ['1) 10% = ' + money(ten) + ', so 20% = ' + money(ten * 2) + '.', '2) 5% = half of 10% = ' + money(ten / 2) + '.', '3) 25% = 20% + 5% = ' + money(t) + ' (or just a quarter of the bill).'] : p === 20 ? ['1) 10% of ' + money(bill) + ' = ' + money(ten) + '.', '2) 20% = double: ' + money(ten * 2) + '.'] : p === 15 ? ['1) 10% = ' + money(ten) + '.', '2) 5% = half of that: ' + money(ten / 2) + '.', '3) 15% = ' + money(ten) + ' + ' + money(ten / 2) + ' = ' + money(t) + '.'] : ['1) 10% = ' + money(ten) + ', so 20% = ' + money(ten * 2) + '.', '2) 2% = ' + money(ten / 5) + '.', '3) 18% = 20% − 2% = ' + money(t) + '.'];
       return done({ q: p + '% tip on ' + money(bill) + '?', o: choices(t, [[ten, 'That’s only 10%.'], [t * 2, 'Twice too much: recheck the doubling step.'], [bill / p, 'You divided by ' + p + ' instead of taking ' + p + '%.']], money),
         steps: steps, trick: 'Everything starts from 10% (move the decimal), then double, halve or trim.', use: 'Everyday, and the exact same move as sizing a position or a stop.' });
     }
   };
-  function makeQ(lv, last) {
-    var pool = Math.random() < 0.55 ? STOCK : GEN, keys = Object.keys(pool).filter(function (k) { return k !== last; }), k = pick(keys), q = pool[k](lv);
+  function makeQ(lv, last) { // Oct 18: no type from the last 5, and never a question you saw in the last 60
+    var pool = Math.random() < 0.55 ? STOCK : GEN, keys = Object.keys(pool).filter(function (k) { return k !== last && !App.recentHas('mathK', k); });
+    if (!keys.length) keys = Object.keys(pool).filter(function (k) { return k !== last; });
+    var k = pick(keys), q = pool[k](lv), tries = 0;
+    while (App.recentHas('mathQ', q.q) && tries++ < 40) { if (tries % 4 === 0) k = pick(keys); q = pool[k](lv); } // small pools: switch type after a few tries
+    App.recentAdd('mathK', k, 5); App.recentAdd('mathQ', q.q, 60);
     q.k = k; q.kind = pool === STOCK ? 'Stocks' : 'Sharpener'; return q;
   }
 

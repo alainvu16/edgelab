@@ -414,5 +414,5 @@ var GL = (function () {
   var obs = new MutationObserver(function () { if (pend) return; pend = setTimeout(function () { pend = null; try { wrap(document.getElementById('view')); wrap(document.getElementById('modal')); } catch (e) {} }, 40); });
   function start() { var m = document.getElementById('main'), md = document.getElementById('modal'); if (m) obs.observe(m, { childList: true, subtree: true, characterData: false }); if (md) obs.observe(md, { childList: true, subtree: true }); wrap(document.getElementById('view')); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
-  return { report: report, T: T, screen: screen, wrap: wrap, show: show, drill: drill, dueCount: dueCount, mastered: mastered };
+  return { known: function (i) { return (gst().box[i] || 0) >= 3; }, left: function (area) { return T.filter(function (t) { return t[2].indexOf(area) >= 0; }).length - mastered(area); }, report: report, T: T, screen: screen, wrap: wrap, show: show, drill: drill, dueCount: dueCount, mastered: mastered };
 })();

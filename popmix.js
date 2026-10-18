@@ -6,26 +6,25 @@
 // toward today's total and the right subject's edge via App.coachFor.
 var POP = (function () {
   var $ = App.$, $$ = App.$$, esc = App.esc;
-  function rnd(a) { return a[Math.floor(Math.random() * a.length)]; }
   function shuf(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
 
   // each maker returns { subj, label, q (html), opts: [{t, ok, why?}], teach } or null when the bank has nothing to ask
   var MAKERS = {
     mkt: function () {
       if (typeof MK === 'undefined' || !MK.Q) return null;
-      var lv = (App.S.mkt && App.S.mkt.level) || 1, pool = MK.Q.filter(function (r) { return r[1] <= Math.min(5, lv + 1); }), r = rnd(pool.length ? pool : MK.Q);
+      var lv = (App.S.mkt && App.S.mkt.level) || 1, pool = MK.Q.filter(function (r) { return r[1] <= Math.min(5, lv + 1); }), r = App.freshPick('popMkt', pool.length ? pool : MK.Q, function (r) { return r[2].slice(0, 40); }, 80);
       return { subj: 'mkt', label: 'Markets · ' + r[0], q: esc(r[2]), opts: r[3].map(function (t, i) { return { t: t, ok: i === 0 }; }), teach: r[4] || '' };
     },
     quote: function () {
       if (typeof WZ === 'undefined' || !WZ.sageList) return null;
-      var got = WZ.sageList(); if (got.length < 4) return null;
-      var x = rnd(got), names = shuf(got.map(function (y) { return y.who; }).filter(function (w, i, a) { return w !== x.who && a.indexOf(w) === i; })).slice(0, 3);
+      var got = WZ.sageAll ? WZ.sageAll() : WZ.sageList(); if (got.length < 4) return null; // Oct 18: all quotes (they're all readable in the library), so pop-ups don't loop on the few you've earned
+      var x = App.freshPick('popQuote', got, function (y) { return y.id; }, 60), names = shuf(got.map(function (y) { return y.who; }).filter(function (w, i, a) { return w !== x.who && a.indexOf(w) === i; })).slice(0, 3);
       if (names.length < 2) return null;
       return { subj: 'quotes', label: 'Quotes · who said it?', q: '<span style="font-style:italic">“' + esc(x.q) + '”</span>', opts: names.map(function (n) { return { t: n, ok: false }; }).concat([{ t: x.who, ok: true }]), teach: x.who + ' · ' + x.role + '. ' + x.m };
     },
     street: function () {
       if (typeof ST === 'undefined' || !ST.ALL || !ST.ALL.length) return null;
-      var x = rnd(ST.ALL);
+      var x = App.freshPick('popStreet', ST.ALL, function (y) { return y.id; }, 80);
       return { subj: 'street', label: 'Street Smarts · ' + x.c, q: esc(x.s) + '<br><b>What do you do?</b>', opts: [{ t: x.r, ok: true }].concat(x.w.map(function (t) { return { t: t, ok: false }; })), teach: x.b + ': ' + x.y };
     },
     math: function () {
@@ -35,7 +34,8 @@ var POP = (function () {
     },
     word: function () {
       if (typeof GL === 'undefined' || !GL.T || GL.T.length < 4) return null;
-      var x = rnd(GL.T), others = shuf(GL.T.filter(function (y) { return y !== x && y[2] === x[2]; })).slice(0, 3);
+      // skip words you've mastered (right 3 times) unless every word is mastered
+      var idx = GL.T.map(function (t, i) { return i; }), open = idx.filter(function (i) { return !GL.known(i); }), i0 = App.freshPick('popWord', open.length ? open : idx, function (i) { return i; }, 80), x = GL.T[i0], others = shuf(GL.T.filter(function (y) { return y !== x && y[2] === x[2]; })).slice(0, 3);
       if (others.length < 3) others = shuf(GL.T.filter(function (y) { return y !== x; })).slice(0, 3);
       // hide each term inside its own definition, so the right answer doesn't name the word
       function hide(y) { var t = y[3]; [y[0]].concat(y[1] || []).sort(function (a, b) { return b.length - a.length; }).forEach(function (w) { if (w.length > 1) t = t.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '___'); }); return t; }
@@ -43,7 +43,7 @@ var POP = (function () {
     },
     think: function () {
       if (typeof TH === 'undefined' || !TH.Q || !TH.Q.length) return null;
-      var r = rnd(TH.Q), subj = { chess: 'chess', xq: 'xq', poker: 'poker', mkt: 'mkt' }[r[0]] || '';
+      var r = App.freshPick('popThink', TH.Q, function (y) { return y[1].slice(0, 40); }, 14), subj = { chess: 'chess', xq: 'xq', poker: 'poker', mkt: 'mkt' }[r[0]] || '';
       return { subj: subj, label: 'Outside the Box', q: esc(r[1]), opts: r[2].map(function (t, i) { return { t: t, ok: i === 0 }; }), teach: r[3] || '' };
     }
   };

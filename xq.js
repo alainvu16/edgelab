@@ -643,7 +643,7 @@ var XQ = (function () {
     if (bn) out.push({ label: 'Opening book: ' + bn.o.name, why: 'Drill ' + bn.o.lines[bn.k].name + ' until you can play it clean three times.', go: function () { bookDrill(bn.o, bn.k); }, quota: 1, w: 1 });
     if (XP.length) out.push({ label: 'Xiangqi puzzles', why: 'Rated tactics from real positions.', go: puzzles, quota: 5, w: 1.3 });
     out.push({ label: 'Coached game vs ' + BOTS[x.level - 1].name, why: 'Every move graded in plain English.', go: function () { play(x.level); }, quota: 1, w: 1 });
-    out.push({ label: 'Piece characters', why: rep.text.indexOf('characters') >= 0 ? rep.text : 'Read the pieces without English letters.', go: charsQuiz, quota: 1, w: .8 });
+    if (CHARS.filter(mastered).length < CHARS.length) out.push({ label: 'Piece characters', why: rep.text.indexOf('characters') >= 0 ? rep.text : 'Read the pieces without English letters.', go: charsQuiz, quota: 1, w: .8 });
     out.push({ label: 'Move trainer', why: 'Tap every legal move; builds board sight.', go: function () { drill(null); }, quota: 4, w: .6 });
     return out;
   }
