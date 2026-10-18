@@ -470,11 +470,13 @@ var App = (function () {
     }
     if (S.breakEvery && curTab !== 'mkt' && ss.sinceBreak >= S.breakEvery * 60000 && mods.mkt) {
       ss.sinceBreak = 0; save();
-      mods.mkt.breakQuiz(done || function () {});
+      if (typeof POP !== 'undefined') POP.round(3, done || function () {}); else mods.mkt.breakQuiz(done || function () {});
       return;
     }
     // every few pauses, a 10-second word recall so new vocabulary doesn't fade
     S.cp = (S.cp || 0) + 1;
+    // Oct 18: every 4th pause, one pop-up question that rotates through every bank (markets, quotes, street smarts, math, words, outside the box)
+    if (S.cp % 4 === 0 && typeof POP !== 'undefined') { save(); POP.one(done || function () {}); return; }
     if (S.cp % 4 === 0 && typeof WZ !== 'undefined' && WZ.recallDue()) { save(); WZ.recallModal(done || function () {}); return; }
     save();
     if (done) done();
@@ -511,7 +513,7 @@ var App = (function () {
     // quick mental math (stocks + everyday): every 5th block
     if (QP.n > 0 && QP.n % 5 === 1 && QP.last !== 'math' && typeof MM !== 'undefined') return { k: 'math', label: 'Quick Math', why: 'Ten fast ones: stock math and mental sharpeners, some against the clock.', go: MM.drill, quota: 1 };
     // quotes you earned: questioned on them every 7th block once there are enough to quiz
-    if (QP.n > 0 && QP.n % 7 === 6 && QP.last !== 'sage' && typeof WZ !== 'undefined' && WZ.sageCount && WZ.sageCount() >= 6 && WZ.sageDue() >= 3) return { k: 'sage', label: 'Quotes: question me', why: WZ.sageDue() + ' of your earned quotes are ready to be tested.', go: WZ.sageQuiz, quota: 1 };
+    if (QP.n > 0 && QP.n % 7 === 6 && QP.last !== 'sage' && typeof WZ !== 'undefined' && WZ.sageQuiz) return { k: 'sage', label: 'Quotes: question me', why: (WZ.sageDue() ? WZ.sageDue() + ' of your earned quotes are ready to be tested.' : 'Who said it, what it means, and when it applies.'), go: WZ.sageQuiz, quota: 1 };
     if (QP.n > 0 && QP.n % 5 === 4 && QP.last !== 'think' && typeof TH !== 'undefined') return { k: 'think', label: 'Creative questions', why: 'Six quick questions on finding the moves most players never consider.', go: TH.quiz, quota: 1 };
     var best = null;
     ['chess', 'xq', 'poker', 'mkt'].forEach(function (k) {
@@ -737,7 +739,9 @@ var App = (function () {
   // which subject a graded answer belongs to: the tab for the four games, the screen for the daily games
   var SUBJ_BY_TITLE = { 'Vocabulary': 'words', 'Words to know': 'words', 'Words to Know': 'words', 'Question me': 'quotes', 'Quick Math': 'math', 'Street Smarts': 'street' };
   function setSubj(k) { var top = stack[stack.length - 1]; if (top) top.subj = k; } // mixed rounds (mastery, monthly test) say which subject each question is
-  function subjNow() { var top = stack[stack.length - 1]; if (top && top.subj) return top.subj; if (['chess', 'xq', 'poker', 'mkt'].indexOf(curTab) >= 0) return curTab; return top ? SUBJ_BY_TITLE[top.title] || '' : ''; }
+  var subjOver = '';
+  function coachFor(k, grade, text, extra) { subjOver = k; try { return coachHTML(grade, text, extra); } finally { subjOver = ''; } } // pop-ups grade into their own subject
+  function subjNow() { if (subjOver) return subjOver; var top = stack[stack.length - 1]; if (top && top.subj) return top.subj; if (['chess', 'xq', 'poker', 'mkt'].indexOf(curTab) >= 0) return curTab; return top ? SUBJ_BY_TITLE[top.title] || '' : ''; }
   function answersToday() { return S && S.daily && S.daily.d === dayKey(new Date()) ? S.daily.n : 0; }
   function coachHTML(grade, text, extra) {
     var counted = grade && grade !== 'info' && tally();
@@ -984,7 +988,7 @@ var App = (function () {
   }
 
   return {
-    backupScreen: backupScreen, idkBtn: idkBtn, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
+    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
     st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, playNow: playNow, playNowBtn: playNowBtn, wirePlayNow: wirePlayNow, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
