@@ -1,0 +1,24 @@
+name: Weekly market data refresh
+on:
+  schedule:
+    - cron: "5 23 * * 0"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -q yfinance
+      - run: |
+          sed -n "/<<'EOF'/,/^ *EOF$/p" refresh-data.yml | sed '1d;$d;s/^          //' > r.py
+          python3 r.py
+          A=$(cat asof.txt); rm -f asof.txt r.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mktdata.js tapedata.js
+          git diff --cached --quiet && exit 0
+          git commit -m "Weekly market data refresh (asof $A)" && git push
