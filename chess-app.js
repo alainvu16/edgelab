@@ -684,6 +684,7 @@ var CZ = (function () {
     App.screen('Openings', function (v) {
       var c = st();
       v.innerHTML = '<p class="mute">Learn the plan, walk through the moves, then drill your side until you can play it clean three times.</p>' +
+        '<button class="item" id="rep"><span class="grow"><span class="t">My repertoire</span><br><span class="s">' + repSummary() + '</span></span><span class="end">›</span></button>' +
         '<span class="eyebrow">As White</span><div class="list" id="w"></div><span class="eyebrow">As Black</span><div class="list" id="b"></div>';
       ['w', 'b'].forEach(function (side) {
         $('#' + side, v).innerHTML = OPS.filter(function (o) { return o.side === side; }).map(function (o) {
@@ -692,7 +693,66 @@ var CZ = (function () {
         }).join('');
       });
       $$('[data-o]', v).forEach(function (b) { b.onclick = function () { opening(OPBYID[b.dataset.o]); }; });
+      $('#rep', v).onclick = repertoire;
     });
+  }
+  // ----- repertoire: one opening for each situation, drilled with the sidelines people actually play against it -----
+  var REP_SLOTS = [['w', 'As White'], ['e4', 'As Black vs 1.e4'], ['d4', 'As Black vs 1.d4'], ['other', 'As Black vs 1.c4 / 1.Nf3']];
+  var REP_GAPS = [0, 864e5, 3 * 864e5, 7 * 864e5, 14 * 864e5, 30 * 864e5];
+  function slotOf(o) { if (o.side === 'w') return 'w'; var m = o.moves.split(' ')[0]; return m === 'e4' ? 'e4' : m === 'd4' ? 'd4' : 'other'; }
+  function rst() { var c = st(); if (!c.rep) c.rep = { pick: {}, box: {} }; return c.rep; }
+  function repLines() { // every line in the repertoire: main line + sidelines, each with its own spaced-review box
+    var r = rst(), out = [];
+    REP_SLOTS.forEach(function (sl) {
+      var o = OPBYID[r.pick[sl[0]]]; if (!o) return;
+      out.push({ key: o.id + ':0', o: o, name: o.name + ' · main line', moves: o.moves, notes: o.notes || {} });
+      ((typeof CHESS_BRANCH !== 'undefined' && CHESS_BRANCH[o.id]) || []).forEach(function (b, k) {
+        var notes = {}; Object.keys(o.notes || {}).forEach(function (i) { if (+i < b.dev) notes[i] = o.notes[i]; });
+        notes[b.dev + 1] = 'They left the main line with ' + b.moves.split(' ')[b.dev] + '. ' + b.note;
+        out.push({ key: o.id + ':' + (k + 1), o: o, name: o.name + ' · ' + b.name, moves: b.moves, notes: notes });
+      });
+    });
+    return out;
+  }
+  function repDue() { var r = rst(), now = Date.now(); return repLines().filter(function (l) { var x = r.box[l.key]; return !x || now - x.at >= REP_GAPS[Math.min(x.b, 5)]; }); }
+  function repSummary() {
+    var r = rst(), n = Object.keys(r.pick).filter(function (k) { return OPBYID[r.pick[k]]; }).length;
+    if (!n) return 'Pick one opening for each situation, then drill the lines opponents really play';
+    var lines = repLines(), sure = lines.filter(function (l) { return (r.box[l.key] || {}).b >= 3; }).length, due = repDue().length;
+    return n + ' opening' + (n > 1 ? 's' : '') + ' · ' + lines.length + ' lines · ' + sure + ' solid' + (due ? ' · ' + due + ' to review' : '');
+  }
+  function repertoire() {
+    App.screen('My repertoire', function (v) {
+      var r = rst(), lines = repLines(), due = repDue();
+      v.innerHTML = '<p class="mute small">One opening for each situation, so you always know your first moves. Each comes with the main line and two sidelines opponents actually play. In a test you don’t know which one is coming: you have to recognize it and answer.</p>' +
+        REP_SLOTS.map(function (sl) {
+          var o = OPBYID[r.pick[sl[0]]], has = OPS.some(function (x) { return slotOf(x) === sl[0]; });
+          if (!has) return '';
+          return '<div class="panel" style="gap:6px"><span class="eyebrow">' + sl[1] + '</span>' + (o ? '<div class="row"><b class="grow">' + esc(o.name) + '</b><button class="btn sm ghost" data-pick="' + sl[0] + '">Change</button></div>' + repLines().filter(function (l) { return l.o === o; }).map(function (l) { var b = (r.box[l.key] || {}).b || 0; return '<div class="row small"><span class="grow">' + esc(l.name.split(' · ')[1]) + '</span><span class="mono">' + '★★★★★'.slice(0, Math.min(5, b)) + '<span class="mute">' + '☆☆☆☆☆'.slice(0, 5 - Math.min(5, b)) + '</span></span></div>'; }).join('') : '<button class="btn" data-pick="' + sl[0] + '">Choose an opening</button>') + '</div>';
+        }).join('') +
+        (lines.length ? '<div class="btns"><button class="btn primary" id="rt">' + (due.length ? 'Test me (' + Math.min(4, due.length) + ' lines due)' : 'Test me anyway') + '</button></div>' : '');
+      $$('[data-pick]', v).forEach(function (b) { b.onclick = function () { pickOpening(b.dataset.pick); }; });
+      if ($('#rt', v)) $('#rt', v).onclick = function () { repTest(); };
+    });
+  }
+  function pickOpening(slot) {
+    App.screen('Choose an opening', function (v) {
+      var list = OPS.filter(function (o) { return slotOf(o) === slot; });
+      v.innerHTML = '<div class="list">' + list.map(function (o) { return '<button class="item" data-o="' + o.id + '"><span class="grow"><span class="t">' + esc(o.name) + '</span><br><span class="s">' + esc(o.theory.split('. ')[0]) + '.</span></span><span class="end">›</span></button>'; }).join('') + '</div>';
+      $$('[data-o]', v).forEach(function (b) { b.onclick = function () { rst().pick[slot] = b.dataset.o; App.save(); App.back(); App.back(); repertoire(); }; });
+    });
+  }
+  // a test: up to 4 due lines in a row, mixed; the line's name stays hidden until you finish it
+  function repTest() {
+    var r = rst(), due = repDue(), pool = (due.length ? due : repLines()).sort(function () { return Math.random() - .5; }).slice(0, 4), k = 0;
+    function next() {
+      if (k >= pool.length) { App.toast('Repertoire test done'); return; }
+      var l = pool[k++];
+      openingDrill({ id: 'rep:' + l.key, name: 'Repertoire test ' + k + '/' + pool.length, side: l.o.side, moves: l.moves, notes: l.notes, hidden: l.name,
+        onDone: function (misses) { var x = r.box[l.key] || { b: 0, at: 0 }; x.b = misses ? Math.max(0, x.b - 1) : Math.min(5, x.b + 1); x.at = Date.now(); r.box[l.key] = x; App.save(); },
+        next: k < pool.length ? function () { App.back(); next(); } : null });
+    }
+    next();
   }
   function opening(o) {
     App.screen(o.name, function (v) {
@@ -721,7 +781,7 @@ var CZ = (function () {
       v.innerHTML = '<div class="row"><span class="pill acc">You play ' + (my === 'w' ? 'White' : 'Black') + '</span><span class="pill" id="pg">0/' + line.length + '</span></div><div id="bd"></div><div id="co"></div><div class="btns" id="bt"></div>';
       var co = $('#co', v);
       var B = mount($('#bd', v), g, { flip: my === 'b', canMove: function () { return !busy && g.turn() === my && i < line.length; }, onMove: onMove });
-      co.innerHTML = App.coachHTML('info', 'Play the main line of the ' + esc(o.name) + '. The other side is played for you.');
+      co.innerHTML = App.coachHTML('info', o.hidden ? 'Play your repertoire. The other side may leave the main line: recognize it and answer.' : 'Play the main line of the ' + esc(o.name) + '. The other side is played for you.');
       function auto() {
         if (i < line.length && g.turn() !== my) {
           busy = true;
@@ -745,8 +805,14 @@ var CZ = (function () {
       }
       function finish() {
         var c = st();
-        if (misses === 0) c.open[o.id] = Math.min(3, (c.open[o.id] || 0) + 1);
+        if (o.onDone) o.onDone(misses); else if (misses === 0) c.open[o.id] = Math.min(3, (c.open[o.id] || 0) + 1);
         App.save();
+        if (o.hidden) { co.innerHTML = App.coachHTML(misses ? 'good' : 'right', '<b>' + esc(o.hidden) + '</b>. ' + (misses ? misses + ' slip' + (misses > 1 ? 's' : '') + '; this line comes back sooner.' : 'Clean: this line comes back in a few days.'));
+          $('#bt', v).innerHTML = o.next ? '<button class="btn primary" id="nxl">Next line</button><button class="btn" id="dn">Stop</button>' : '<button class="btn primary" id="dn">Done</button>';
+          if (o.next) $('#nxl').onclick = function () { App.checkpoint(o.next); };
+          $('#dn').onclick = function () { App.checkpoint(App.back); };
+          return;
+        }
         co.innerHTML = App.coachHTML(misses ? 'good' : 'right', misses ? 'Line complete with ' + misses + ' slip' + (misses > 1 ? 's' : '') + '. Run it clean to earn a star.' : 'Clean run! ' + (c.open[o.id] >= 3 ? 'Mastered.' : 'Star earned (' + c.open[o.id] + '/3).'));
         $('#bt', v).innerHTML = '<button class="btn primary" id="ag">Again</button><button class="btn" id="dn">Done</button>';
         $('#ag').onclick = function () { App.checkpoint(function () { App.back(); openingDrill(o); }); };
@@ -961,6 +1027,7 @@ var CZ = (function () {
     if (rep.sev > 0.15) out.push({ label: 'Chess: ' + rep.action.replace(/^Lesson: /, 'lesson: '), why: rep.text, go: rep.go, quota: 3, w: 2 });
     var nl = -1; for (var i = 0; i < LESSONS.length; i++) if (lessonOpen(i) && !lessonDone(LESSONS[i])) { nl = i; break; }
     if (nl >= 0) out.push({ label: 'Chess lesson: ' + LESSONS[nl].t, why: 'Next step in your curriculum.', go: function () { lesson(nl); }, quota: 3, w: 1.3 });
+    if (repLines().length && repDue().length) out.push({ label: 'Repertoire test', why: repDue().length + ' of your opening lines are due. You don’t know which sideline is coming.', go: repTest, quota: 1, w: 1.2 });
     out.push({ label: 'Chess puzzles', why: 'Rated puzzles pitched just above your level (' + c.rating + ').', go: function () { puzzles({}); }, quota: 5, w: 1.5 });
     out.push({ label: 'Coached game vs ' + BOTS[c.botLevel - 1].name, why: 'Every move graded. Wins unlock the next bot.', go: function () { play(c.botLevel, Math.random() < .5 ? 'w' : 'b'); }, quota: 1, w: 1 });
     var eg = Object.keys(ENDG).filter(function (k) { return !(c.endg || {})[k]; })[0];

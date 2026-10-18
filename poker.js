@@ -1,6 +1,6 @@
 // ===================== POKER (Texas Hold'em) =====================
 var PK = (function () {
-  var $ = typeof App !== 'undefined' ? App.$ : null, $$ = typeof App !== 'undefined' ? App.$$ : null;
+  var $ = typeof App !== 'undefined' ? App.$ : null, $$ = typeof App !== 'undefined' ? App.$$ : null, esc = typeof App !== 'undefined' ? App.esc : function (x) { return x; };
   var SUIT = ['♠', '♥', '♦', '♣'], RCH = { 10: 'T', 11: 'J', 12: 'Q', 13: 'K', 14: 'A' };
   var CAT = ['High card', 'One pair', 'Two pair', 'Three of a kind', 'Straight', 'Flush', 'Full house', 'Four of a kind', 'Straight flush'];
   var CATD = ['no pair, highest card plays', 'two cards of the same rank', 'two different pairs', 'three cards of the same rank', 'five ranks in a row', 'five cards of one suit', 'three of a kind plus a pair', 'all four cards of one rank', 'five in a row, all one suit'];
@@ -78,18 +78,20 @@ var PK = (function () {
   }
 
   // equity by Monte Carlo. villainMin = minimum Chen score of villain hands we sample
-  function equity(hero, board, iters, villainMin) {
-    var known = hero.concat(board), d = deck(known), win = 0, tie = 0, n = 0, guard = 0;
+  // equity(hero, board, iters, villainMin, opps): chance to win against opps random hands (default 1);
+  // villainMin (a Chen floor) applies to the first opponent, the one who showed strength
+  function equity(hero, board, iters, villainMin, opps) {
+    var known = hero.concat(board), d = deck(known), win = 0, tie = 0, n = 0, guard = 0, k = Math.max(1, opps || 1), need = 2 * k + 5 - board.length;
     iters = iters || 600;
     while (n < iters && guard < iters * 20) {
       guard++;
       // partial shuffle
-      for (var i = 0; i < 2 + 5 - board.length; i++) { var j = i + Math.floor(Math.random() * (d.length - i)); var t = d[i]; d[i] = d[j]; d[j] = t; }
-      var vh = [d[0], d[1]];
-      if (villainMin != null && chen(vh) < villainMin) continue;
-      var bd = board.concat(d.slice(2, 2 + 5 - board.length));
-      var hs = evalHand(hero.concat(bd)), vs = evalHand(vh.concat(bd));
-      if (hs > vs) win++; else if (hs === vs) tie++;
+      for (var i = 0; i < need; i++) { var j = i + Math.floor(Math.random() * (d.length - i)); var t = d[i]; d[i] = d[j]; d[j] = t; }
+      if (villainMin != null && chen([d[0], d[1]]) < villainMin) continue;
+      var bd = board.concat(d.slice(2 * k, need));
+      var hs = evalHand(hero.concat(bd)), best = -1;
+      for (var o = 0; o < k; o++) { var vs = evalHand([d[2 * o], d[2 * o + 1]].concat(bd)); if (vs > best) { best = vs; } }
+      if (hs > best) win++; else if (hs === best) tie++;
       n++;
     }
     return n ? (win + tie / 2) / n : 0.5;
@@ -490,7 +492,7 @@ var PK = (function () {
       v.innerHTML = '<div><span class="eyebrow">Texas Hold’em</span><h1>Level ' + p.level + ' · ' + title(p.level) + '</h1><p class="mute small">Drill streak ' + p.streak + '/5 to level up · ' + p.right + '/' + p.total + ' correct overall</p></div>' +
         '<div class="bar"><i style="width:' + (p.streak / 5 * 100) + '%"></i></div>' +
         (function () { var r = report()[0]; return '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + r.text + '</p><button class="btn sm" id="repgo">' + r.action + ' ›</button></div>'; })() +
-        '<div class="btns"><button class="btn primary" id="cs">Course</button><button class="btn" id="dr">Train drills</button><button class="btn" id="pl">Play heads-up</button></div>' +
+        '<div class="btns"><button class="btn primary" id="cs">Course</button><button class="btn" id="dr">Train drills</button><button class="btn" id="pl">Play heads-up</button><button class="btn" id="pt">Play a table</button></div>' +
         (function () { p.course = p.course || {}; var nx = COURSE.findIndex(function (c, i) { return !p.course[i]; }); return nx >= 0 ? '<button class="item" id="cnext"><span class="grow"><span class="t">Next lesson: ' + COURSE[nx].t + '</span><br><span class="s">' + COURSE[nx].u + ' · ' + Object.keys(p.course).length + ' / ' + COURSE.length + ' done</span></span><span class="end">›</span></button>' : ''; })() +
         '<div class="stats"><div class="stat"><span class="v">' + p.hands + '</span><span class="k">Hands played</span></div><div class="stat"><span class="v">' + acc + '%</span><span class="k">Good decisions</span></div><div class="stat"><span class="v">' + (p.chips >= 0 ? '+' : '') + p.chips + '</span><span class="k">Chips won</span></div></div>' +
         '<h2>Quick reference</h2><div class="list">' + LEARN.map(function (k, i) {
@@ -502,6 +504,7 @@ var PK = (function () {
       if ($('#cnext', v)) $('#cnext', v).onclick = function () { var nx = COURSE.findIndex(function (c, i) { return !stt().course[i]; }); if (courseOpen(nx)) lessonPK(nx); else course(); };
       $('#repgo', v).onclick = report()[0].go;
       $('#pl', v).onclick = botMenu;
+      $('#pt', v).onclick = tableMenu;
       $$('[data-k]', v).forEach(function (b) { b.onclick = function () { var k = b.dataset.k; if (typesFor(stt().level).indexOf(k) >= 0 || stt().seen[k]) App.modal('<div class="grab"></div><h2>' + INTRO[k][0] + '</h2><p>' + INTRO[k][1] + '</p>' + (k === 'name' ? rankingsTable() : '') + '<button class="btn" id="cl">Close</button>'), App.$('#cl') && (App.$('#cl').onclick = App.closeModal); }; });
     });
   }
@@ -928,6 +931,243 @@ var PK = (function () {
     });
   }
 
+  // ---------- multiway table: you and 2–5 bots, real positions, side pots, a coach on every decision ----------
+  var POS_NAMES = { 3: ['BTN', 'SB', 'BB'], 4: ['BTN', 'SB', 'BB', 'CO'], 5: ['BTN', 'SB', 'BB', 'UTG', 'CO'], 6: ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO'] };
+  var POS_FULL = { BTN: 'Button', SB: 'Small blind', BB: 'Big blind', UTG: 'Under the gun', HJ: 'Hijack', CO: 'Cutoff' };
+  var OPEN_CHEN = { UTG: 9, HJ: 8, CO: 7, BTN: 6, SB: 7, BB: 7 };   // first in: raise this Chen score or better from each seat
+  function tableMenu() {
+    App.screen('Poker table', function (v) {
+      var p = stt(); p.multi = p.multi || { hands: 0, net: 0, size: 6 };
+      v.innerHTML = '<p class="mute">A full ring: you against 2 to 5 bots, blinds $1/$2, 100 big blinds each. Position matters now: the later you act, the more hands you can play. Every decision is graded against how many players are still in.</p>' +
+        '<span class="eyebrow">Players at the table</span><div class="seg" id="sz">' + [3, 4, 6].map(function (n) { return '<button aria-pressed="' + (p.multi.size === n) + '" data-n="' + n + '">' + n + (n === 6 ? '-max' : ' players') + '</button>'; }).join('') + '</div>' +
+        '<div class="stats"><div class="stat"><span class="v">' + p.multi.hands + '</span><span class="k">Table hands</span></div><div class="stat"><span class="v">' + (p.multi.net >= 0 ? '+$' : '−$') + Math.abs(p.multi.net) + '</span><span class="k">Net at tables</span></div></div>' +
+        '<p class="small mute">The bots are the personalities you have unlocked in heads-up, mixed at random. Busted bots rebuy, so the game keeps going.</p><button class="btn primary" id="go" style="width:100%">Sit down</button>';
+      $$('[data-n]', v).forEach(function (b) { b.onclick = function () { p.multi.size = +b.dataset.n; App.save(); $$('[data-n]', v).forEach(function (q) { q.setAttribute('aria-pressed', q === b); }); }; });
+      $('#go', v).onclick = function () { playMulti(p.multi.size); };
+    });
+  }
+  // small cards for the bots' seats so six players fit on a phone
+  function miniCards(cs) {
+    return '<span style="display:inline-flex;gap:3px">' + cs.map(function (c) {
+      var base = 'display:inline-flex;align-items:center;justify-content:center;width:26px;height:36px;border-radius:5px;font:700 12px/1 var(--mono);';
+      if (c == null) return '<span style="' + base + 'background:repeating-linear-gradient(45deg,#8e2a2a 0 3px,#a83636 3px 6px);border:2px solid #f4efe6"></span>';
+      return '<span style="' + base + 'flex-direction:column;background:#f8f5ee;color:' + (su(c) === 1 || su(c) === 2 ? '#c0322b' : '#151925') + '" aria-label="' + cstr(c) + '">' + rname(rk(c)) + '<span style="font-size:11px">' + SUIT[su(c)] + '</span></span>';
+    }).join('') + '</span>';
+  }
+  function playMulti(n) {
+    App.screen(n + '-player table', function (v) {
+      var P = stt(); P.multi = P.multi || { hands: 0, net: 0, size: n };
+      var pool = BOTS.filter(function (b) { return b.lv <= Math.max(2, P.bot); }), used = {};
+      var seats = [{ name: 'You', bot: null }];
+      var deal = shuffle(pool.slice());   // different personalities first; repeats only when the table is bigger than the pool
+      for (var i = 1; i < n; i++) { var b = deal[(i - 1) % deal.length]; used[b.name] = (used[b.name] || 0) + 1; seats.push({ name: b.name + (used[b.name] > 1 ? ' ' + used[b.name] : ''), bot: b }); }
+      var M = { stacks: seats.map(function () { return 200; }), button: Math.floor(Math.random() * n), rebuys: 0 };
+      var H, helperOn = P.helper !== false;
+      v.innerHTML = '<div class="pkplay" style="display:flex;flex-direction:column;gap:12px"><div id="tbl"></div><div class="pkctl"><div id="help"></div><div id="act" class="btns"></div><div id="co"></div><div id="log" class="small mute"></div></div></div>';
+      function nx(i) { return (i + 1) % n; }
+      function pos(i) { return POS_NAMES[n][(i - M.button + n) % n]; }
+      function live(i) { return !H.folded[i]; }
+      function canAct(i) { return !H.folded[i] && M.stacks[i] > 0; }
+      function inHand() { var c = 0; for (var i = 0; i < n; i++) if (live(i)) c++; return c; }
+      function nextToAct(i) { for (var k = 1; k <= n; k++) { var j = (i + k) % n; if (canAct(j)) return j; } return -1; }
+      function potTotal() { return H.pot + H.bets.reduce(function (a, b) { return a + b; }, 0); }
+      function toCall(p) { return Math.max(0, H.cur - H.bets[p]); }
+      function post(p, a) { a = Math.min(a, M.stacks[p]); M.stacks[p] -= a; H.bets[p] += a; H.contrib[p] += a; }
+      function newHand() {
+        if (M.stacks[0] <= 0) return busted();
+        for (var i = 1; i < n; i++) if (M.stacks[i] <= 0) { M.stacks[i] = 200; }   // bots rebuy
+        M.button = nx(M.button);
+        var d = shuffle(deck()), hole = [];
+        for (i = 0; i < n; i++) hole.push([d[2 * i], d[2 * i + 1]]);
+        H = { deck: d, dpos: 2 * n, hole: hole, board: [], pot: 0, bets: seats.map(function () { return 0; }), contrib: seats.map(function () { return 0; }), folded: seats.map(function () { return false; }), acted: seats.map(function () { return false; }), street: 0, cur: 2, lastRaise: 2, raised: false, aggr: -1, done: false, decs: [], start: M.stacks.slice(), log: [] };
+        var sb = nx(M.button), bb = nx(sb);
+        post(sb, 1); post(bb, 2);
+        H.toAct = nextToAct(bb);
+        $('#co', v).innerHTML = ''; render();
+        $('#log', v).textContent = 'You are ' + POS_FULL[pos(0)] + ' (' + pos(0) + ').';
+        step();
+      }
+      function act(p, a) {
+        var nm = seats[p].name, tc = toCall(p);
+        if (a.type === 'fold') { H.folded[p] = true; H.log.push(nm + ' fold'); }
+        else if (a.type === 'check') { H.log.push(nm + ' check'); }
+        else if (a.type === 'call') { post(p, tc); H.log.push(nm + ' call $' + Math.min(tc, H.bets[p])); }
+        else {
+          var to = Math.max(Math.min(H.bets[p] + M.stacks[p], H.cur + H.lastRaise), Math.min(H.bets[p] + M.stacks[p], Math.round(a.to)));
+          if (to - H.cur > H.lastRaise) H.lastRaise = to - H.cur;
+          post(p, to - H.bets[p]);
+          if (H.bets[p] > H.cur) { H.cur = H.bets[p]; H.raised = true; H.aggr = p; for (var i = 0; i < n; i++) if (i !== p) H.acted[i] = false; }
+          H.log.push(nm + (tc ? ' raise to $' : ' bet $') + H.bets[p] + (M.stacks[p] === 0 ? ' (all-in)' : ''));
+        }
+        H.acted[p] = true;
+        if (inHand() === 1) { for (var w = 0; w < n; w++) if (live(w)) return win([w], seats[w].name === 'You' ? 'Everyone folded to you.' : 'Everyone else folded.'); }
+        var open = false; for (var j = 0; j < n; j++) if (canAct(j) && (!H.acted[j] || H.bets[j] < H.cur)) open = true;
+        if (!open) return endStreet();
+        H.toAct = nextToAct(p); render(); step();
+      }
+      function endStreet() {
+        H.pot += H.bets.reduce(function (a, b) { return a + b; }, 0); H.bets = H.bets.map(function () { return 0; }); H.cur = 0; H.lastRaise = 2; H.raised = false; H.aggr = -1;
+        H.acted = H.acted.map(function () { return false; });
+        var withChips = 0; for (var i = 0; i < n; i++) if (canAct(i)) withChips++;
+        if (H.street === 3) return showdown();
+        if (withChips <= 1) { while (H.board.length < 5) H.board.push(H.deck[H.dpos++]); H.street = 3; return showdown(); }
+        H.street++;
+        var k = H.street === 1 ? 3 : 1; for (i = 0; i < k; i++) H.board.push(H.deck[H.dpos++]);
+        H.toAct = nextToAct(M.button); render(); step();
+      }
+      // side pots: each contribution level is its own pot, won by the best hand among players who put in that much
+      function showdown() {
+        H.reveal = true;
+        var score = seats.map(function (s, i) { return live(i) ? evalHand(H.hole[i].concat(H.board)) : -1; });
+        var levels = H.contrib.filter(function (c, i) { return c > 0; }).sort(function (a, b) { return a - b; }).filter(function (x, i, a) { return a.indexOf(x) === i; });
+        var prev = 0, won = seats.map(function () { return 0; }), lines = [];
+        levels.forEach(function (L) {
+          var amt = 0; H.contrib.forEach(function (c) { amt += Math.max(0, Math.min(c, L) - Math.min(c, prev)); });
+          var elig = []; for (var i = 0; i < n; i++) if (live(i) && H.contrib[i] >= L) elig.push(i);
+          if (!elig.length) { var hi = -1; for (i = 0; i < n; i++) if (live(i) && (hi < 0 || H.contrib[i] > H.contrib[hi])) hi = i; elig = [hi]; }
+          var best = Math.max.apply(null, elig.map(function (i) { return score[i]; })), ws = elig.filter(function (i) { return score[i] === best; });
+          var share = Math.floor(amt / ws.length); ws.forEach(function (w, k) { won[w] += share + (k === 0 ? amt - share * ws.length : 0); });
+          if (amt) lines.push((lines.length ? 'Side pot' : 'Main pot') + ' $' + amt + ' → ' + ws.map(function (w) { return seats[w].name; }).join(' & ') + ' (' + CAT[cat(best)].toLowerCase() + ')');
+          prev = L;
+        });
+        won.forEach(function (x, i) { M.stacks[i] += x; });
+        finishHand(lines.join('. ') + '.');
+      }
+      function win(ws, why) { M.stacks[ws[0]] += H.pot + H.bets.reduce(function (a, b) { return a + b; }, 0); H.pot = 0; H.bets = H.bets.map(function () { return 0; }); finishHand(why); }
+      function finishHand(why) {
+        H.done = true; P.multi.hands++; P.hands++;
+        var net = M.stacks[0] - H.start[0]; P.multi.net += net; P.chips += net; App.save();
+        if ($('#help', v)) $('#help', v).innerHTML = '';
+        render();
+        var good = H.decs.filter(function (d) { return d.grade === 'best' || d.grade === 'good'; }).length;
+        $('#co', v).innerHTML = '<div class="panel"><div class="row"><h3 class="grow">' + (net > 0 ? 'You won $' + net : net < 0 ? 'You lost $' + (-net) : 'Even') + '</h3><span class="pill">' + good + '/' + H.decs.length + ' good decisions</span></div><p class="small">' + esc(why) + '</p>' +
+          (H.decs.length ? '<div class="list">' + H.decs.map(function (d) { return App.coachHTML(d.grade, d.text, '<span class="small mute">' + d.street + '</span>'); }).join('') + '</div>' : '') +
+          '<p class="small mute">With more players, someone has a strong hand more often. Play tighter early, looser late.</p></div>';
+        $('#act', v).innerHTML = '<button class="btn primary" id="nh">Next hand</button><button class="btn" id="lv">Leave table</button>';
+        $('#nh', v).onclick = function () { App.checkpoint(newHand); };
+        $('#lv', v).onclick = function () { App.checkpoint(App.back); };
+      }
+      function busted() {
+        $('#tbl', v).innerHTML = ''; $('#help', v).innerHTML = '';
+        $('#co', v).innerHTML = '<div class="panel"><h2>You’re out of chips</h2><p>Look back at the hands where you put the most in: was it the right price for how many players were still in? Rebuy and keep going.</p></div>';
+        $('#act', v).innerHTML = '<button class="btn primary" id="rb">Rebuy $200</button><button class="btn" id="lv">Leave table</button>';
+        $('#rb', v).onclick = function () { M.stacks[0] = 200; M.rebuys++; P.multi.net -= 0; newHand(); };
+        $('#lv', v).onclick = function () { App.checkpoint(App.back); };
+      }
+      function streetName() { return ['Preflop', 'Flop', 'Turn', 'River'][H.street]; }
+      function render() {
+        var rv = H.reveal;
+        var bots = seats.map(function (s, i) {
+          if (i === 0) return '';
+          var st = H.folded[i] ? 'Folded' : M.stacks[i] === 0 && H.contrib[i] ? 'All-in' : '';
+          return '<div class="seat" style="gap:3px;opacity:' + (H.folded[i] ? .45 : 1) + ';' + (H.toAct === i && !H.done ? 'outline:2px solid var(--accent);outline-offset:3px;border-radius:10px' : '') + '"><span class="nm" style="font-size:11px;gap:4px">' + (M.button === i ? '<span class="dealer" style="width:16px;height:16px;line-height:16px;font-size:9px">D</span>' : '') + esc(s.name) + '</span><span class="small mono" style="font-size:11px;color:#e9e3d6">' + pos(i) + ' · $' + M.stacks[i] + '</span>' +
+            miniCards(rv && !H.folded[i] ? H.hole[i] : [null, null]) +
+            '<span class="betchip" style="font-size:11px;min-height:14px">' + (H.bets[i] ? '$' + H.bets[i] : st) + '</span></div>';
+        }).join('');
+        $('#tbl', v).innerHTML = '<div class="table" style="gap:8px;padding:10px">' +
+          '<div style="display:grid;grid-template-columns:repeat(' + Math.min(3, n - 1) + ',minmax(0,1fr));gap:6px;width:100%">' + bots + '</div>' +
+          '<div class="cards">' + [0, 1, 2, 3, 4].map(function (i) { return H.board[i] != null ? cardHTML(H.board[i]) : '<span class="pcard" style="background:rgba(255,255,255,.07);box-shadow:none"></span>'; }).join('') + '</div>' +
+          '<span class="pot">Pot $' + potTotal() + ' · ' + streetName() + ' · ' + inHand() + ' in</span>' +
+          '<div class="seat">' + (H.bets[0] ? '<span class="betchip">bet $' + H.bets[0] + '</span>' : '') + cardsHTML(H.hole[0], { big: true }) + '<span class="nm">' + (M.button === 0 ? '<span class="dealer">D</span>' : '') + 'You · ' + pos(0) + ' <span class="chips">$' + M.stacks[0] + '</span>' + (H.board.length >= 3 ? ' · ' + CAT[cat(evalHand(H.hole[0].concat(H.board)))] : ' · ' + handLabel(H.hole[0])) + '</span></div></div>';
+        $('#log', v).textContent = H.log.slice(-5).join(' · ');
+      }
+      function step() {
+        if (H.done) return;
+        if (H.toAct !== 0) { $('#act', v).innerHTML = '<div class="thinking">' + esc(seats[H.toAct].name) + ' is thinking</div>'; setTimeout(botAct, 550); }
+        else heroControls();
+      }
+      function opps() { return inHand() - 1; }
+      function aggrMin() { return H.aggr > 0 && seats[H.aggr].bot ? seats[H.aggr].bot.raiseThr : null; }
+      function heroControls() {
+        var tc = toCall(0), pt = potTotal(), mx = H.bets[0] + M.stacks[0], mt = Math.min(mx, H.cur + H.lastRaise);
+        var half = Math.round(H.cur + 0.5 * (pt + tc)), full = Math.round(H.cur + (pt + tc));
+        if (H.street === 0 && !H.raised) { half = 6; full = 8; }
+        function clamp(x) { return Math.max(mt, Math.min(mx, x)); }
+        var html = '';
+        if (tc > 0) html += '<button class="btn" data-a="fold">Fold</button>';
+        html += tc > 0 ? '<button class="btn" data-a="call">Call $' + Math.min(tc, M.stacks[0]) + '</button>' : '<button class="btn" data-a="check">Check</button>';
+        if (M.stacks[0] > tc) {
+          var label = tc > 0 || H.street === 0 ? 'Raise to $' : 'Bet $';
+          uniq([clamp(half), clamp(full)]).filter(function (x) { return x < mx; }).forEach(function (x) { html += '<button class="btn" data-a="raise" data-to="' + x + '">' + label + x + '</button>'; });
+          html += '<button class="btn primary" data-a="raise" data-to="' + mx + '">All-in $' + mx + '</button>';
+        }
+        $('#act', v).innerHTML = html;
+        $$('[data-a]', v).forEach(function (b) { b.onclick = function () { heroAct({ type: b.dataset.a, to: +b.dataset.to }); }; });
+        showHelp();
+      }
+      function showHelp() {
+        var el = $('#help', v); if (!el) return;
+        if (H.done || H.toAct !== 0) { el.innerHTML = ''; return; }
+        if (!helperOn) { el.innerHTML = '<button class="btn sm ghost" id="hon">Show table coach</button>'; $('#hon', v).onclick = function () { helperOn = true; showHelp(); }; return; }
+        var tc = toCall(0), pt = potTotal(), rows = [['Seat', POS_FULL[pos(0)] + ' · ' + opps() + ' opponent' + (opps() === 1 ? '' : 's') + ' still in']];
+        if (!H.board.length) rows.push(['Your hand', handLabel(H.hole[0]) + ' · Chen ' + chen(H.hole[0]) + (H.raised && H.cur > 2 ? '' : ' · open from ' + pos(0) + ' with Chen ' + OPEN_CHEN[pos(0)] + '+')]);
+        else rows.push(['Your hand', CAT[cat(evalHand(H.hole[0].concat(H.board)))]]);
+        if (tc > 0) rows.push(['Price', 'Call $' + tc + ' to win $' + (pt + tc) + ' → need ' + Math.round(100 * tc / (pt + tc)) + '%']);
+        rows.push(['Multiway rule', opps() >= 3 ? 'Against 3+ players, bluffs rarely work and one pair is often beaten. Bet strong hands, draw cheaply, fold the rest.' : 'Fewer players: medium hands go up in value; position helps you steal.']);
+        el.innerHTML = '<div class="panel" style="gap:6px;padding:10px 12px"><div class="row"><span class="eyebrow grow">Table coach</span><button class="btn sm ghost" id="hoff">Hide</button></div>' + rows.map(function (r) { return '<div class="small"><b>' + r[0] + ':</b> ' + r[1] + '</div>'; }).join('') + '<div class="row"><button class="btn sm" id="pro">What would a pro do?</button></div><div id="prot" class="small"></div></div>';
+        $('#hoff', v).onclick = function () { helperOn = false; showHelp(); };
+        $('#pro', v).onclick = function () { var e = equity(H.hole[0], H.board, 500, aggrMin(), opps()), need = tc / (pt + tc); $('#prot', v).innerHTML = '<b>Pro move:</b> ' + (tc > 0 ? (e >= need + 0.15 && e * (opps() + 1) > 1.6 ? 'Raise for value: ' : e >= need ? 'Call: ' : 'Fold: ') : (e * (opps() + 1) > 1.5 ? 'Bet for value: ' : 'Check: ')) + 'you win about ' + Math.round(e * 100) + '% against ' + opps() + ' player' + (opps() === 1 ? '' : 's') + (tc > 0 ? ' and need ' + Math.round(need * 100) + '%.' : '.'); };
+      }
+      function heroAct(a) {
+        if ($('#help', v)) $('#help', v).innerHTML = '';
+        $('#act', v).innerHTML = '<div class="thinking">Coach is reviewing</div>';
+        var tc = toCall(0), pt = potTotal(), st = streetName();
+        setTimeout(function () {
+          var e = equity(H.hole[0], H.board, 600, aggrMin(), opps()), d = grade(a, e, tc, pt);
+          d.street = st + ' · ' + pos(0); H.decs.push(d);
+          P.dec.all++; var good = d.grade === 'best' || d.grade === 'good'; if (good) P.dec.good++;
+          P.byStreet = P.byStreet || {}; var bs = P.byStreet[st] || { ok: 0, n: 0 }; bs.n++; if (good) bs.ok++; P.byStreet[st] = bs;
+          App.save();
+          $('#co', v).innerHTML = App.coachHTML(d.grade, d.text, '<span class="small mute">' + d.street + '</span>');
+          act(0, a);
+        }, 20);
+      }
+      function grade(a, e, tc, pt) {
+        var o = opps(), need = tc / (pt + tc), fair = 1 / (o + 1), pc = function (x) { return Math.round(x * 100) + '%'; };
+        var head = 'Against ' + o + ' player' + (o === 1 ? '' : 's') + ' you had about <b>' + pc(e) + '</b> (an average hand here wins ' + pc(fair) + '). ';
+        if (H.street === 0) {
+          var c = chen(H.hole[0]), ps = pos(0), open = OPEN_CHEN[ps], facing = H.raised && H.cur > 2;
+          if (!facing) {
+            if (a.type === 'fold') return tc === 0 ? { grade: 'inacc', text: 'You could check for free in the big blind. Never fold when checking costs nothing.' } : { grade: c >= open ? 'mistake' : 'good', text: handLabel(H.hole[0]) + ' (Chen ' + c + ') from ' + POS_FULL[ps] + '. ' + (c >= open ? 'Strong enough to open from this seat (Chen ' + open + '+ here).' : 'Fine fold: from ' + ps + ' you open Chen ' + open + '+.') };
+            if (a.type === 'raise') return { grade: c >= open ? 'best' : c >= open - 2 ? 'inacc' : 'mistake', text: handLabel(H.hole[0]) + ' (Chen ' + c + ') from ' + POS_FULL[ps] + '. ' + (c >= open ? 'Good open: raising takes the initiative.' : 'Too loose for this seat: with ' + (n - 1) + ' opponents, open Chen ' + open + '+ from ' + ps + '. Later seats can play more hands.') };
+            return { grade: tc === 0 ? (c >= 8 ? 'inacc' : 'good') : c >= open ? 'inacc' : c >= open - 2 ? 'good' : 'mistake', text: handLabel(H.hole[0]) + ' (Chen ' + c + '). ' + (tc === 0 ? (c >= 8 ? 'Strong hand: raise the limpers instead of checking.' : 'Checking your option is fine.') : c >= open ? 'Raise rather than limp: limping invites everyone in cheaply.' : 'Limping into a multiway pot with a weak hand loses money over time.') };
+          }
+          var callT = OPEN_CHEN[ps] + 1, threeT = 10;
+          if (a.type === 'fold') return { grade: c >= callT ? 'mistake' : 'good', text: handLabel(H.hole[0]) + ' (Chen ' + c + ') facing a raise. ' + (c >= callT ? 'Too strong to fold here.' : 'Good fold: vs a raise with players behind, you need Chen ' + callT + '+ to continue.') };
+          if (a.type === 'raise') return { grade: c >= threeT ? 'best' : c >= callT + 1 ? 'good' : 'mistake', text: handLabel(H.hole[0]) + ' (Chen ' + c + '). ' + (c >= threeT ? 'Strong 3-bet: premium hands want a big pot.' : c >= callT + 1 ? 'A 3-bet works, though calling is fine too.' : 'Too weak to re-raise into a raiser with others still to act.') };
+          return { grade: c >= threeT ? 'inacc' : c >= callT ? 'good' : 'mistake', text: handLabel(H.hole[0]) + ' (Chen ' + c + '). ' + (c >= threeT ? 'Premium hand: 3-bet so worse hands pay more.' : c >= callT ? 'Reasonable call.' : 'Calling a raise with a weak hand, out of line with players behind, bleeds chips.') };
+        }
+        if (tc > 0) {
+          head += 'Calling needed <b>' + pc(need) + '</b>. ';
+          if (a.type === 'fold') return e >= need + .06 ? { grade: 'mistake', text: head + 'The price was good: folding gives up money over time.' } : { grade: 'best', text: head + 'Good fold: below the price.' };
+          if (a.type === 'call') return e < need - .06 ? { grade: 'mistake', text: head + 'Too expensive for your chance.' } : e > fair * 1.8 ? { grade: 'good', text: head + 'Fine, but you are well ahead of the field: raise to charge the draws.' } : { grade: 'best', text: head + 'Correct: your chance beats the price.' };
+          return e > fair * 1.6 ? { grade: 'best', text: head + 'Strong raise: you are well ahead of an average hand here.' } : e >= need ? { grade: 'good', text: head + 'The raise is okay; calling keeps the pot smaller.' } : { grade: 'mistake', text: head + 'A bluff-raise into ' + o + ' players rarely works: someone usually has something.' };
+        }
+        if (a.type === 'check') return e > fair * 1.7 ? { grade: 'inacc', text: head + 'You are well ahead: bet so the others pay to draw.' } : { grade: 'good', text: head + 'Checking a medium hand in a multiway pot is fine.' };
+        return e > fair * 1.4 ? { grade: 'best', text: head + 'Value bet: plenty of worse hands can call.' } : o >= 2 && e < fair ? { grade: 'mistake', text: head + 'A bluff into ' + o + ' players: with this many, someone usually calls.' } : { grade: 'good', text: head + 'Okay bet. With weaker hands, checking keeps the pot small.' };
+      }
+      function botAct() {
+        if (H.done) return;
+        var p = H.toAct, b = seats[p].bot, tc = toCall(p), pt = potTotal(), o = opps(), r = Math.random();
+        var need = tc / (pt + tc), a;
+        if (H.street === 0) {
+          var c = chen(H.hole[p]) + b.loose * 20, ps = pos(p), open = OPEN_CHEN[ps];
+          if (!H.raised || H.cur <= 2) a = c >= open || r < b.bluff * .5 ? { type: 'raise', to: 6 + 2 * (n - 3 > 0 ? 1 : 0) } : tc === 0 ? { type: 'check' } : (ps === 'SB' && c >= open - 2) ? { type: 'call' } : { type: 'fold' };
+          else a = c >= b.raiseThr + 2 && r < .7 ? { type: 'raise', to: H.cur * 3 } : c >= Math.max(b.callThr, open - 1) ? { type: 'call' } : { type: 'fold' };
+        } else {
+          var e = equity(H.hole[p], H.board, 220, H.aggr >= 0 && H.aggr !== p ? 7 : null, o) + b.loose, rel = e * (o + 1);
+          if (tc > 0) a = rel > 1.9 && M.stacks[p] > tc ? { type: 'raise', to: H.cur + b.frac * (pt + tc) } : e >= need - .02 ? { type: 'call' } : { type: 'fold' };
+          else a = rel > 1.35 || (o <= 1 && r < b.bluff) ? { type: 'raise', to: Math.max(2, Math.round(b.frac * pt)) } : { type: 'check' };
+        }
+        if (a.type === 'raise' && M.stacks[p] <= tc) a = { type: 'call' };
+        if (a.type === 'check' && tc > 0) a = { type: 'call' };
+        act(p, a);
+      }
+      window.__mw = function () { return { stacks: M.stacks.slice(), start: H.start.slice(), pot: potTotal(), done: H.done }; };   // read-only peek for the test suite
+      newHand();
+    });
+  }
+
   function place() {
     var order = ['name', 'cmp', 'pre', 'outs', 'odds', 'eq', 'concept', 'odds'], i = 0, miss = 0, passed = 0;
     App.screen('Poker placement', function (v) {
@@ -977,11 +1217,12 @@ var PK = (function () {
     var nx = COURSE.findIndex(function (c, i) { return !P.course[i]; });
     if (nx >= 0 && courseOpen(nx)) out.push({ label: 'Poker lesson: ' + COURSE[nx].t, why: COURSE[nx].u + ' · read it, then 6 questions.', go: function () { lessonPK(nx); }, quota: 1, w: 1.8 });
     out.push({ label: 'Poker drills', why: rep.sev > 0.15 ? rep.text : 'Level ' + P.level + ' mix; your weakest types come up more.', go: drills, quota: 8, w: 1.4 });
+    if (P.bot >= 2) out.push({ label: (P.multi && P.multi.size || 6) + '-player table', why: 'Real positions and side pots: open tight early, wider late, and price your draws against the whole field.', go: function () { playMulti((P.multi && P.multi.size) || 6); }, quota: 6, w: 0.9 });
     out.push({ label: 'Heads-up vs ' + BOTS[Math.min(P.bot, BOTS.length) - 1].name, why: 'Table coach on: outs, odds and what beats you before every decision.', go: function () { play(BOTS[Math.min(P.bot, BOTS.length) - 1], false); }, quota: 6, w: 1.1 });
     return out;
   }
   if (typeof App !== 'undefined') App.reg('poker', { home: home, place: place, report: report, quick: quick });
   if (typeof applyDistract === 'function') { applyDistract(EXTRA_CONCEPTS, 1, 2); applyDistract(READS, 0, 1); }
-  return { cardsHTML: cardsHTML, evalHand: evalHand, cat: cat, chen: chen, equity: equity, outsInfo: outsInfo, GEN: GEN, CAT: CAT, course: course, lessonPK: lessonPK, COURSE: COURSE, drills: drills, botMenu: botMenu, play: play, BOTS: BOTS, courseOpen: courseOpen };
+  return { tableMenu: tableMenu, playMulti: playMulti, cardsHTML: cardsHTML, evalHand: evalHand, cat: cat, chen: chen, equity: equity, outsInfo: outsInfo, GEN: GEN, CAT: CAT, course: course, lessonPK: lessonPK, COURSE: COURSE, drills: drills, botMenu: botMenu, play: play, BOTS: BOTS, courseOpen: courseOpen };
 })();
 if (typeof module !== 'undefined') module.exports = PK;

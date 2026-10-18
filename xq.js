@@ -264,7 +264,7 @@ var XQ = (function () {
       var x = st(), ee = estElo();
       v.innerHTML = '<div><span class="eyebrow">Xiangqi · Chinese chess</span><h1>Est. Elo ' + ee.elo + '</h1><p class="mute small">Bot level ' + x.level + ' · ' + x.games.w + 'W ' + x.games.l + 'L ' + x.games.d + 'D · estimate is ' + ee.conf + (ee.conf === 'rough' ? ', play more games to sharpen it' : '') + '</p></div>' +
         (function () { var r = report()[0]; return '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + r.text + '</p><button class="btn sm" id="repgo">' + r.action + ' ›</button></div>'; })() +
-        '<div class="btns"><button class="btn primary" id="pl">Play bot</button><button class="btn" id="dr">Move trainer</button><button class="btn" id="ch">Characters</button>' + (XP.length ? '<button class="btn" id="pz">Puzzles</button>' : '') + '</div>' +
+        '<div class="btns"><button class="btn primary" id="pl">Play bot</button><button class="btn" id="dr">Move trainer</button><button class="btn" id="ch">Characters</button>' + (XP.length ? '<button class="btn" id="pz">Puzzles</button>' : '') + (BOOK.length ? '<button class="btn" id="ob">Opening book</button>' : '') + '</div>' +
         '<div class="row"><label class="row small"><input type="checkbox" id="lb"' + (x.labels ? ' checked' : '') + '> Show English letters on pieces</label></div>' +
         '<h2>Learn the game</h2><div class="list">' + LESSONS.map(function (l, i) {
           var d = x.lessons[l.id];
@@ -272,6 +272,7 @@ var XQ = (function () {
         }).join('') + '</div>';
       $('#lb', v).onchange = function () { st().labels = this.checked; App.save(); };
       $('#pl', v).onclick = playMenu;
+      if ($('#ob', v)) $('#ob', v).onclick = book;
       $('#repgo', v).onclick = report()[0].go;
       $('#dr', v).onclick = function () { drill(null); };
       $('#ch', v).onclick = charsQuiz;
@@ -521,10 +522,124 @@ var XQ = (function () {
     if (!out.length) out.push({ sev: 0, text: 'Play a few games and run the move trainer; the coach will map what to fix.', action: 'Play bot', go: playMenu });
     return out.sort(function (a, b) { return b.sev - a.sev; });
   }
+  // ---------- opening book: standard openings in WXF notation, walked through and drilled on the board ----------
+  // WXF: piece letter + file + (+ forward, - back, . sideways) + number. Files count 1–9 from each player's own right.
+  // Rooks, cannons, pawns, king: the number is ranks moved (or the new file when sideways); horse, elephant, advisor: the new file.
+  var WXF_P = { K: 'K', G: 'K', A: 'A', E: 'E', B: 'E', H: 'H', N: 'H', R: 'R', C: 'C', P: 'P' };
+  function wxf(s, str) {
+    var t = String(str).trim().toUpperCase(), side = s.turn, front = null, L, file = null, op, num;
+    var m1 = t.match(/^([KGAEBHNRCP])([1-9])([+\-.=])([1-9])$/), m2 = t.match(/^([+\-])([KGAEBHNRCP])([+\-.=])([1-9])$/);
+    if (m1) { L = WXF_P[m1[1]]; file = +m1[2]; op = m1[3]; num = +m1[4]; }
+    else if (m2) { front = m2[1] === '+'; L = WXF_P[m2[2]]; op = m2[3]; num = +m2[4]; }
+    else return null;
+    if (op === '=') op = '.';
+    var colOf = function (f) { return side === 'r' ? 9 - f : f - 1; }, dir = side === 'r' ? -1 : 1;
+    var legal = E.legal(s).filter(function (m) { return s.b[m.f] === side + L; });
+    if (file != null) legal = legal.filter(function (m) { return m.f % 9 === colOf(file); });
+    else { // tandem pieces on one file: + is the one further forward
+      var cols = {}; legal.forEach(function (m) { var c = m.f % 9; (cols[c] = cols[c] || []).push((m.f / 9) | 0); });
+      var c = Object.keys(cols).filter(function (k) { return cols[k].filter(function (r, i, a) { return a.indexOf(r) === i; }).length >= 2; })[0]; if (c == null) return null;
+      var rows = cols[c].filter(function (r, i, a) { return a.indexOf(r) === i; }).sort(function (a, b) { return (a - b) * dir; });
+      var pick = front ? rows[rows.length - 1] : rows[0];
+      legal = legal.filter(function (m) { return m.f % 9 === +c && ((m.f / 9) | 0) === pick; });
+    }
+    var hits = legal.filter(function (m) {
+      var fr = (m.f / 9) | 0, fc = m.f % 9, tr = (m.t / 9) | 0, tc = m.t % 9;
+      if ('RCPK'.indexOf(L) >= 0) { if (op === '.') return tr === fr && tc === colOf(num); return tc === fc && tr === fr + (op === '+' ? dir : -dir) * num; }
+      if (op === '.') return false;
+      return tc === colOf(num) && (tr - fr) * dir * (op === '+' ? 1 : -1) > 0;
+    });
+    return hits.length === 1 ? hits[0] : null;
+  }
+  function bookLine(line) { // turn a WXF line into engine moves; null if any move doesn't parse to exactly one legal move
+    var s = E.start(), out = [];
+    for (var i = 0; i < line.moves.length; i++) { var m = wxf(s, line.moves[i]); if (!m) return null; out.push(m); E.make(s, m); }
+    return out;
+  }
+  // lines that don't parse to legal moves are dropped (the build checks them too)
+  var BOOK = (typeof XQ_BOOK !== 'undefined' ? XQ_BOOK : []).map(function (o) { o.lines = o.lines.filter(function (l) { l.mv = bookLine(l); return !!l.mv; }); return o; }).filter(function (o) { return o.lines.length; });
+  function bst() { var x = st(); x.book = x.book || {}; return x.book; }
+  function book() {
+    App.screen('Opening book', function (v) {
+      var bk = bst();
+      v.innerHTML = '<p class="mute small">The openings strong players actually use. Read the idea, walk through the moves, then drill your side until you can play it clean. Moves are shown in WXF notation (piece, file, direction, number) so you can follow books and videos.</p>' +
+        [['r', 'As Red'], ['b', 'As Black']].map(function (g) {
+          var list = BOOK.filter(function (o) { return o.side === g[0]; }); if (!list.length) return '';
+          return '<span class="eyebrow">' + g[1] + '</span><div class="list">' + list.map(function (o) {
+            var stars = o.lines.reduce(function (t, l, k) { return t + Math.min(3, bk[o.id + ':' + k] || 0); }, 0), max = o.lines.length * 3;
+            return '<button class="item' + (stars >= max ? ' done' : '') + '" data-o="' + o.id + '"><span class="grow"><span class="t">' + esc(o.name) + ' <span class="mute" style="font-family:var(--han)">' + esc(o.zh || '') + '</span></span><br><span class="s">' + o.lines.length + ' lines · ' + stars + '/' + max + ' stars</span></span><span class="end">›</span></button>';
+          }).join('') + '</div>';
+        }).join('');
+      $$('[data-o]', v).forEach(function (b) { b.onclick = function () { bookOpening(BOOK.filter(function (o) { return o.id === b.dataset.o; })[0]); }; });
+    });
+  }
+  function bookOpening(o) {
+    App.screen(o.name, function (v) {
+      var li = 0;
+      function draw() {
+        var line = o.lines[li], mv = line.mv, s = E.start(), i = 0;
+        v.innerHTML = '<div class="prose"><p>' + esc(o.idea) + '</p><ul>' + o.keys.map(function (k) { return '<li>' + esc(k) + '</li>'; }).join('') + '</ul></div>' +
+          (o.lines.length > 1 ? '<div class="seg" id="ls">' + o.lines.map(function (l, k) { return '<button aria-pressed="' + (k === li) + '" data-li="' + k + '">' + esc(l.name) + '</button>'; }).join('') + '</div>' : '') +
+          '<div id="bd"></div><div id="co"></div><div class="btns"><button class="btn" id="pv">‹ Back</button><button class="btn" id="nx">Next ›</button><button class="btn primary" id="dr">Drill it</button></div>';
+        var B = mount($('#bd', v), s, { flip: o.side === 'b', canMove: function () { return false; }, onMove: function () {} });
+        function show() {
+          var co = $('#co', v);
+          if (!i) { co.innerHTML = App.coachHTML('info', 'Tap Next to walk through ' + esc(line.name) + '. You play ' + (o.side === 'r' ? 'Red' : 'Black') + '.'); return; }
+          var who = (i - 1) % 2 === 0 ? 'Red' : 'Black', note = (line.notes || {})[i - 1];
+          co.innerHTML = App.coachHTML('info', '<b>' + Math.ceil(i / 2) + '. ' + esc(line.moves[i - 1]) + '</b> (' + who + ')' + (note ? '. ' + esc(note) : '.'));
+        }
+        function replay(k) { s = E.start(); for (var j = 0; j < k; j++) E.make(s, mv[j]); B = mount($('#bd', v), s, { flip: o.side === 'b', canMove: function () { return false; }, onMove: function () {} }); B.ui.last = k ? mv[k - 1] : null; B.render(); }
+        $('#nx', v).onclick = function () { if (i < mv.length) { i++; replay(i); show(); } };
+        $('#pv', v).onclick = function () { if (i > 0) { i--; replay(i); show(); } };
+        $('#dr', v).onclick = function () { bookDrill(o, li); };
+        $$('[data-li]', v).forEach(function (b) { b.onclick = function () { li = +b.dataset.li; draw(); }; });
+        show();
+      }
+      draw();
+    });
+  }
+  function bookDrill(o, li) {
+    App.screen('Drill: ' + o.name, function (v) {
+      var line = o.lines[li], mv = line.mv, s = E.start(), i = 0, misses = 0, busy = false, wrong = 0, my = o.side;
+      v.innerHTML = '<div class="row"><span class="pill acc">You play ' + (my === 'r' ? 'Red' : 'Black') + '</span><span class="pill" id="pg">0/' + mv.length + '</span></div><div id="bd"></div><div id="co"></div><div class="btns" id="bt"></div>';
+      var co = $('#co', v), B = mount($('#bd', v), s, { flip: my === 'b', canMove: function () { return !busy && s.turn === my && i < mv.length; }, onMove: onMove });
+      co.innerHTML = App.coachHTML('info', 'Play ' + esc(line.name) + '. The other side is played for you.');
+      function same(a, b) { return a.f === b.f && a.t === b.t; }
+      function auto() {
+        if (i < mv.length && s.turn !== my) { busy = true; setTimeout(function () { E.make(s, mv[i]); B.ui.last = mv[i]; i++; B.render(); $('#pg', v).textContent = i + '/' + mv.length; busy = false; if (i >= mv.length) finish(); }, 450); }
+      }
+      function onMove(m) {
+        if (same(m, mv[i])) {
+          E.make(s, m); B.ui.last = m; B.ui.hint = null; i++; wrong = 0; B.render(); $('#pg', v).textContent = i + '/' + mv.length;
+          var note = (line.notes || {})[i - 1];
+          co.innerHTML = App.coachHTML('right', '<b>' + esc(line.moves[i - 1]) + '</b>' + (note ? '. ' + esc(note) : '.'));
+          if (i >= mv.length) finish(); else auto();
+        } else {
+          misses++; wrong++;
+          if (wrong >= 2) { B.ui.hint = mv[i]; B.render(); }
+          co.innerHTML = App.coachHTML('wrong', 'Not the book move here. ' + (wrong >= 2 ? 'It’s <b>' + esc(line.moves[i]) + '</b> (highlighted).' : 'Think about the plan: ' + esc(o.keys[0]) + '.'));
+        }
+      }
+      function finish() {
+        var bk = bst(), key = o.id + ':' + li;
+        if (!misses) bk[key] = Math.min(3, (bk[key] || 0) + 1);
+        App.save();
+        co.innerHTML = App.coachHTML(misses ? 'good' : 'right', misses ? 'Line done with ' + misses + ' slip' + (misses > 1 ? 's' : '') + '. Run it clean for a star.' : 'Clean run! ' + (bk[key] >= 3 ? 'Mastered.' : 'Star earned (' + bk[key] + '/3).'));
+        $('#bt', v).innerHTML = '<button class="btn primary" id="ag">Again</button><button class="btn" id="dn">Done</button>';
+        $('#ag', v).onclick = function () { App.checkpoint(function () { App.back(); bookDrill(o, li); }); };
+        $('#dn', v).onclick = function () { App.checkpoint(App.back); };
+      }
+      auto();
+    });
+  }
+  function bookNext() { var bk = bst(), best = null; BOOK.forEach(function (o) { o.lines.forEach(function (l, k) { var b = bk[o.id + ':' + k] || 0; if (b < 3 && (!best || b < best.b || (b === best.b && o.lv < best.o.lv))) best = { o: o, k: k, b: b }; }); }); return best; }
+
   function quick() {
     var x = st(), out = [], rep = report()[0];
     var nl = LESSONS.filter(function (l) { return !x.lessons[l.id]; })[0];
     if (nl) out.push({ label: 'Xiangqi lesson: ' + nl.t, why: 'Next step in the course.', go: function () { lesson(nl); }, quota: 2, w: 1.5 });
+    var bn = BOOK.length && x.level >= 2 ? bookNext() : null;
+    if (bn) out.push({ label: 'Opening book: ' + bn.o.name, why: 'Drill ' + bn.o.lines[bn.k].name + ' until you can play it clean three times.', go: function () { bookDrill(bn.o, bn.k); }, quota: 1, w: 1 });
     if (XP.length) out.push({ label: 'Xiangqi puzzles', why: 'Rated tactics from real positions.', go: puzzles, quota: 5, w: 1.3 });
     out.push({ label: 'Coached game vs ' + BOTS[x.level - 1].name, why: 'Every move graded in plain English.', go: function () { play(x.level); }, quota: 1, w: 1 });
     out.push({ label: 'Piece characters', why: rep.text.indexOf('characters') >= 0 ? rep.text : 'Read the pieces without English letters.', go: charsQuiz, quota: 1, w: .8 });
@@ -533,5 +648,5 @@ var XQ = (function () {
   }
   App.reg('xq', { home: home, place: place, report: report, quick: quick });
   if (typeof applyDistract === 'function') applyDistract(LESSONS.filter(function (l) { return l.q && l.q.length === 3; }).map(function (l) { return l.q; }), 0, 1);
-  return { estElo: estElo, xIdea: xIdea, analyse: analyse, makeDrill: makeDrill, home: home, lesson: lesson, LESSONS: LESSONS, playMenu: playMenu, play: play, puzzles: puzzles, charsQuiz: charsQuiz, drill: drill, BOTS: BOTS, CHARS: CHARS, mastered: mastered, hasPuzzles: function () { return XP.length > 0; } };
+  return { book: book, wxf: wxf, BOOK: BOOK, estElo: estElo, xIdea: xIdea, analyse: analyse, makeDrill: makeDrill, home: home, lesson: lesson, LESSONS: LESSONS, playMenu: playMenu, play: play, puzzles: puzzles, charsQuiz: charsQuiz, drill: drill, BOTS: BOTS, CHARS: CHARS, mastered: mastered, hasPuzzles: function () { return XP.length > 0; } };
 })();

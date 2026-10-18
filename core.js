@@ -306,9 +306,15 @@ var App = (function () {
       speechSynthesis.speak(u);
     } catch (e) {}
   }
+  // sound-it-out spelling next to the speaker (e.g. "yoo-BIK-wih-tus"); shown even when the phone can't speak
+  function respell(word) {
+    if (typeof RESPELL === 'undefined' || !word) return '';
+    var r = RESPELL[word]; if (!r) { var lw = String(word).toLowerCase(); for (var k in RESPELL) if (k.toLowerCase() === lw) { r = RESPELL[k]; break; } }
+    return r ? '<span class="rsp mono" style="margin-left:6px;font-size:12px;font-weight:500;letter-spacing:.02em;color:var(--mute)">' + esc(r) + '</span>' : '';
+  }
   function sayBtn(word) {
-    if (!canSay) return '';
-    return '<button type="button" class="say" data-say="' + esc(word) + '" aria-label="Hear ' + esc(word) + '"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>';
+    if (!canSay) return respell(word);
+    return respell(word) + '<button type="button" class="say" data-say="' + esc(word) + '" aria-label="Hear ' + esc(word) + '"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor"/><path d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>';
   }
   if (typeof document !== 'undefined') document.addEventListener('click', function (e) { var b = e.target && e.target.closest && e.target.closest('[data-say]'); if (b) { e.preventDefault(); e.stopPropagation(); say(b.dataset.say); } }, true);
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }

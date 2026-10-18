@@ -4,7 +4,7 @@
 // New ones arrive a few per round, easiest first, mixed across categories. Progress is keyed by the principle's text.
 var ST = (function () {
   var $ = App.$, $$ = App.$$, esc = App.esc;
-  var CATS = ['Thinking traps', 'Negotiation', 'Scams & money', 'People & work'];
+  var CATS = ['Thinking traps', 'Negotiation', 'Scams & money', 'People & work', 'Life skills', 'Relationships'];
   var ROUND = 8, NEW_PER_ROUND = 3;
   var GAPS = [0, 30 * 60e3, 6 * 3600e3, 2 * 86400e3, 6 * 86400e3, 14 * 86400e3];
   function hk(t) { var v = 0; for (var i = 0; i < t.length; i++) v = (v * 31 + t.charCodeAt(i)) | 0; return 't' + (v >>> 0).toString(36); }
@@ -81,7 +81,7 @@ var ST = (function () {
   function home() {
     App.screen('Street Smarts', function (v) {
       var s = st(), l = learned().length, d = due().length;
-      v.innerHTML = '<div><span class="eyebrow">Learn by doing</span><h1>Street Smarts</h1><p class="mute small">Negotiating, spotting scams and money traps, reading people at work, and the thinking traps that cost you in games, trades and life. Each round is real situations: you choose, then you get the why. A few new ones arrive each round, basics first.</p></div>' +
+      v.innerHTML = '<div><span class="eyebrow">Learn by doing</span><h1>Street Smarts</h1><p class="mute small">Negotiating, spotting scams and money traps, reading people at work, everyday life skills, family, friends and community, and the thinking traps that cost you in games, trades and life. Each round is real situations: you choose, then you get the why. A few new ones arrive each round, basics first.</p></div>' +
         '<div class="panel" style="gap:8px"><div class="row"><span class="pill acc">' + l + ' of ' + ALL.length + ' learned</span><span class="pill">' + mastered().length + ' mastered</span>' + (d ? '<span class="pill">' + d + ' to review</span>' : '') + '</div>' +
         CATS.map(function (c) { var all = ALL.filter(function (x) { return x.c === c; }), got = all.filter(function (x) { return s.seen[x.id]; }).length, m = all.filter(function (x) { return (s.box[x.id] || 0) >= 4; }).length; return '<div><div class="row small"><span class="grow">' + c + '</span><span class="mono">' + got + ' / ' + all.length + (m ? ' · ' + m + ' mastered' : '') + '</span></div><div class="bar" aria-hidden="true"><i style="width:' + (all.length ? Math.round(got / all.length * 100) : 0) + '%"></i></div></div>'; }).join('') +
         '<button class="btn primary" id="sq" style="width:100%">' + (l ? 'Test me' : 'Start') + '</button></div>';
