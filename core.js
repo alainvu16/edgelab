@@ -761,6 +761,25 @@ var App = (function () {
       ['Xiangqi bot', 'Lv ' + (x.level || 1)], ['Poker', 'Lv ' + (p.level || 1)], ['Markets', 'Lv ' + (m.level || 1)]
     ].map(function (a) { return '<div class="stat"><span class="v">' + a[1] + '</span><span class="k">' + a[0] + '</span></div>'; }).join('');
   }
+  // Settings live behind one button on Home, so nothing big gets tapped by accident.
+  // Reset sits folded at the bottom and still asks to confirm (a safety copy is kept under Backups).
+  function settingsScreen() {
+    screen('Settings', function (v) {
+      v.innerHTML = '<div class="list">' +
+        '<button class="item" id="ss1"><span class="grow"><span class="t">Session, breaks and look</span><br><span class="s">Time box, market breaks, full-day nudge, celebrations</span></span><span class="end">›</span></button>' +
+        '<button class="item" id="ss2"><span class="grow"><span class="t">Backups</span><br><span class="s">Daily copies, backup code, restore</span></span><span class="end">›</span></button>' +
+        '<button class="item" id="ss3"><span class="grow"><span class="t">Celebrations</span><br><span class="s">After wins and level-ups</span></span><span class="end">' + (S.fx === false ? 'Off' : 'On') + '</span></button></div>' +
+        '<details class="panel" style="margin-top:18px"><summary class="small mute" style="cursor:pointer">Danger zone</summary><p class="small mute">Starts every subject over. A safety copy is saved first, so you can restore it from Backups.</p><button class="btn" id="reset" style="color:var(--bad);border-color:var(--bad)">Reset all progress…</button></details>';
+      $('#ss1', v).onclick = sessionSheet;
+      $('#ss2', v).onclick = backupScreen;
+      $('#ss3', v).onclick = function () { S.fx = S.fx === false; save(); if (S.fx) celebrate('level'); App.back(); settingsScreen(); };
+      $('#reset', v).onclick = function () {
+        modal('<h2>Reset all progress?</h2><p class="mute">Levels, ratings and stats go back to the start. A safety copy is kept under Backups, so you can undo this.</p><div class="btns"><button class="btn" id="no">Keep my progress</button><button class="btn" id="yes" style="color:var(--bad);border-color:var(--bad)">Reset</button></div>');
+        $('#no').onclick = closeModal;
+        $('#yes').onclick = function () { snapshot(true, 'before reset'); S = defaults(); App.S = S; save(); if (cloudDoc) cloudPush(); closeModal(); tab('home'); };
+      };
+    });
+  }
   function home() {
     root('Home', function (v) {
       var hr = new Date().getHours();
@@ -777,25 +796,19 @@ var App = (function () {
         '<div><span class="eyebrow">Hours toward ' + HOUR_GOAL + ' each</span><div class="list" style="gap:6px">' + [['chess', 'Chess'], ['xq', 'Xiangqi'], ['poker', 'Poker'], ['mkt', 'Markets']].map(function (t) { var h = hoursOf(t[0]); return '<div class="row"><span class="small" style="width:70px">' + t[1] + '</span><div class="bar grow"><i style="width:' + Math.min(100, h / HOUR_GOAL * 100) + '%"></i></div><span class="mono small mute" style="width:52px;text-align:right">' + (h < 1 ? Math.round(h * 60) + 'm' : h.toFixed(1) + 'h') + '</span></div>'; }).join('') + '</div><p class="small mute">Counts time you are actively training. Each track holds roughly 25 hours of structured material, and the bots, puzzles and replays keep going after that.</p></div>' +
         '<div style="margin-top:10px"><span class="eyebrow">Your levels</span><div class="stats">' + levelStats() + '</div></div>' +
         '<p class="mute mono" style="font-size:10px;opacity:.6;margin-top:10px">screen ' + screen.width + '×' + screen.height + ' · view ' + innerWidth + '×' + innerHeight + (window.visualViewport ? ' · vv ' + Math.round(visualViewport.height) : '') + (navigator.standalone ? ' · app' : '') + '</p>' + '</details>' +
-        '<div class="row"><button class="btn sm ghost" id="sess">Session &amp; break settings</button><button class="btn sm ghost" id="bk">Backups</button><button class="btn sm ghost" id="reset">Reset progress</button><button class="btn sm ghost" id="fxt">Celebrations: ' + (S.fx === false ? 'off' : 'on') + '</button><span class="small mute" id="cs">' + (cloudStatus === 'ok' ? 'Progress synced to your account' : cloudStatus === 'err' ? 'Saved on this device only' : 'Saved on this device') + '</span></div>' +
+        '<div class="row"><button class="btn sm ghost" id="sets">Settings</button><span class="small mute" id="cs">' + (cloudStatus === 'ok' ? 'Progress synced to your account' : cloudStatus === 'err' ? 'Saved on this device only' : 'Saved on this device') + '</span></div>' +
         '<p class="small mute">Market questions are for learning, not investment advice. Practice charts use simulated prices.</p>';
       $$('[data-go]', v).forEach(function (b) { b.onclick = function () { tab(b.dataset.go); }; });
       $$('[data-wk]', v).forEach(function (b) { b.onclick = function () { focusCache[+b.dataset.wk].r.go(); }; });
-      $('#sess', v).onclick = sessionSheet; if ($('#rsc', v)) $('#rsc', v).onclick = backupScreen; $('#bk', v).onclick = backupScreen;
+      $('#sets', v).onclick = settingsScreen; if ($('#rsc', v)) $('#rsc', v).onclick = backupScreen;
       $('#qp', v).onclick = function () { if (QP.active) qpNext(); else quickPlay(); };
       if ($('#edgechip', v)) $('#edgechip', v).onclick = function () { EG.screen(edgeCheck); };
       if ($('#spx', v)) $('#spx', v).onclick = spxSheet;
       if (typeof EG !== 'undefined' && !$('#modal').innerHTML && !EG.welcome(edgeCheck)) EG.monthlyOffer();
       if ($('#path', v)) $('#path', v).onclick = RM.home;
       if (QP.active) $('#qpstop', v).onclick = function () { qpStop(); home(); };
-      $('#fxt', v).onclick = function () { S.fx = S.fx === false; save(); if (S.fx) celebrate('level'); home(); };
       $$('[data-game]', v).forEach(function (b) { b.onclick = function () { ({ vocab: WZ.vocab, think: TH.quiz, books: WZ.library, wisdom: WZ.wisdomScreen, math: function () { MM.drill(); }, street: function () { ST.home(); }, thinkhome: TH.home, words: function () { GL.drill(); } })[b.dataset.game](); }; });
       if ($('#qod', v).id === 'qod') $('#qod', v).onclick = function () { var m = $('#qodm', v); m.hidden = !m.hidden; };
-      $('#reset', v).onclick = function () {
-        modal('<h2>Reset all progress?</h2><p class="mute">Levels, ratings and stats go back to the start. A safety copy is kept under Backups, so you can undo this.</p><div class="btns"><button class="btn" id="no">Keep</button><button class="btn primary" id="yes">Reset</button></div>');
-        $('#no').onclick = closeModal;
-        $('#yes').onclick = function () { snapshot(true, 'before reset'); S = defaults(); App.S = S; save(); if (cloudDoc) cloudPush(); closeModal(); home(); };
-      };
     });
   }
   // ---------- the front: hero "cockpit" ----------
