@@ -366,11 +366,11 @@ var App = (function () {
     h.innerHTML = (canBack ? '<button class="back" aria-label="Back" id="bk">‹</button><div class="crumb">' + esc(title) + '</div>'
       : '<div class="brand">Edge<b>Lab</b></div><div class="crumb"></div>') +
       (QP.active ? '<button class="timer" id="qpn" style="color:var(--accent);border-color:var(--accent)" aria-label="Skip to next quick play block">Skip ⟳</button><button class="timer" id="qpx" aria-label="Stop quick play">Stop ■</button>' : '') +
-      (QP.active && !S.session.active ? '' : '<button class="timer" id="tm" aria-label="Session timer"></button>');
+      (QP.active ? '' : '<button class="timer" id="tm" aria-label="Session timer"></button>');
     if (QP.active) $('#qpn').onclick = function () { var a = qpPick(); var sheet = modal('<div class="grab"></div><span class="eyebrow">Quick play</span><h2>Skip to: ' + qname(a.k) + '</h2><p><b>' + esc(a.label) + '</b></p><div class="btns"><button class="btn primary" id="qgo">Go</button><button class="btn" id="qx">Stay</button></div><button class="btn ghost" id="qstop">Stop quick play</button>'); $('#qgo', sheet).onclick = function () { qpLaunch(a); }; $('#qx', sheet).onclick = closeModal; $('#qstop', sheet).onclick = qpStop; };
     if (QP.active) $('#qpx').onclick = qpStop;
     if (canBack) $('#bk').onclick = back;
-    $('#tm').onclick = sessionSheet;
+    if ($('#tm')) $('#tm').onclick = sessionSheet;
     tickUI();
   }
 
