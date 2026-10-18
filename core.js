@@ -345,10 +345,13 @@ var App = (function () {
     stack.push({ title: title, fn: fn });
     draw();
   }
+  var backTap = false; // true only when the person taps the ‹ arrow (activities also call back() when a round ends)
   function back() {
     stack.pop();
     if (!stack.length) { tab(curTab); } else draw();
     // quick play is continuous: if you leave an activity and nothing new opens, the next block starts by itself
+    // Oct 18: in a section's Play now, backing out means you're done: stop quietly (Play now on the section page restarts it)
+    if (backTap && QP.active && QP.only && stack.length <= 1) { playNowEnd(); tab(curTab); return; }
     if (QP.active) setTimeout(function () { if (QP.active && stack.length <= 1 && !$('#modal').innerHTML) qpBlockDone(function () {}, true); }, 0);
   }
   function draw() {
@@ -369,7 +372,7 @@ var App = (function () {
       (QP.active ? '' : '<button class="timer" id="tm" aria-label="Session timer"></button>');
     if (QP.active) $('#qpn').onclick = function () { var a = qpPick(); var sheet = modal('<div class="grab"></div><span class="eyebrow">Quick play</span><h2>Skip to: ' + qname(a.k) + '</h2><p><b>' + esc(a.label) + '</b></p><div class="btns"><button class="btn primary" id="qgo">Go</button><button class="btn" id="qx">Stay</button></div><button class="btn ghost" id="qstop">Stop quick play</button>'); $('#qgo', sheet).onclick = function () { qpLaunch(a); }; $('#qx', sheet).onclick = closeModal; $('#qstop', sheet).onclick = qpStop; };
     if (QP.active) $('#qpx').onclick = qpStop;
-    if (canBack) $('#bk').onclick = back;
+    if (canBack) $('#bk').onclick = function () { backTap = true; back(); backTap = false; };
     if ($('#tm')) $('#tm').onclick = sessionSheet;
     tickUI();
   }
@@ -554,6 +557,7 @@ var App = (function () {
   }
   // section Play now: one button at the top of Chess / Xiangqi / Poker / Markets
   function playNow(k) { quickPlay(false, k); }
+  function playNowEnd() { QP.active = false; QP.only = null; FADE.run = 0; S.qpOn = 0; S.qpOnly = null; save(); closeModal(); toast('Play now stopped'); }
   function playNowBtn(k) {
     var on = QP.active && QP.only === k;
     return '<button class="btn primary hqp" id="playnow">' + (on ? 'Keep playing' : 'Play now') + '<span>' + (on ? qname(k) + ' only · keeps going until you stop' : 'Picks your next step and keeps going until you stop') + '</span></button>';
@@ -582,9 +586,9 @@ var App = (function () {
       return;
     }
     var a = qpPick();
-    var sheet = modal('<div class="grab"></div><span class="eyebrow">Quick play · block ' + QP.n + ' done</span><h2>Next up: ' + qname(a.k) + '</h2><p><b>' + esc(a.label) + '</b></p>' + (a.why ? '<p class="mute small">' + a.why + '</p>' : '') +
+    var sheet = modal('<div class="grab"></div><span class="eyebrow">' + (QP.only ? 'Play now · ' + qname(QP.only) : 'Quick play') + ' · block ' + QP.n + ' done</span><h2>Next up: ' + qname(a.k) + '</h2><p><b>' + esc(a.label) + '</b></p>' + (a.why ? '<p class="mute small">' + a.why + '</p>' : '') +
       '<div class="bar" aria-hidden="true"><i id="qbar" style="width:0%;transition:width ' + QP_WAIT + 'ms linear"></i></div><p class="small mute" id="qcd">Starting by itself in a few seconds.</p>' +
-      '<div class="btns"><button class="btn primary" id="qgo">Go now</button><button class="btn" id="qstay">' + (left ? 'Stay here' : 'Keep doing this') + '</button></div><button class="btn ghost" id="qstop">Stop quick play</button>', false);
+      '<div class="btns"><button class="btn primary" id="qgo">Go now</button><button class="btn" id="qstay">' + (left ? 'Stay here' : 'Keep doing this') + '</button></div><button class="btn ghost" id="qstop">' + (QP.only ? 'Stop' : 'Stop quick play') + '</button>', false);
     var auto = setTimeout(function () { if (QP.active && document.body.contains(sheet)) qpLaunch(a); }, QP_WAIT);
     requestAnimationFrame(function () { requestAnimationFrame(function () { var b = $('#qbar', sheet); b.style.width = '100%'; }); });
     $('#qgo', sheet).onclick = function () { clearTimeout(auto); qpLaunch(a); };
@@ -977,7 +981,7 @@ var App = (function () {
     App.S = S;
     applySkin();
     if (S.qpOn) { QP.active = true; QP.only = S.qpOnly || null; } // quick play was on when the app closed: Home offers Resume
-    $$('#tabs button').forEach(function (b) { b.onclick = function () { tab(b.dataset.tab); }; });
+    $$('#tabs button').forEach(function (b) { b.onclick = function () { if (QP.active && QP.only && b.dataset.tab !== QP.only) playNowEnd(); tab(b.dataset.tab); }; });
     setInterval(tick, 1000);
     setInterval(function () { if (cloudDoc) cloudPush(); }, 60000);
     setTimeout(ghCheckOnOpen, 2500);
