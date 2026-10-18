@@ -106,7 +106,7 @@ var WZ = (function () {
   function sageLeft() { return Math.max(1, SAGE_EVERY - (sst().tick || 0)); }
   function sageMastered() { var bx = sst().box; return sageGot().filter(function (x) { return (bx[x.id] || 0) >= 4; }).length; }
   var SG_GAPS = [0, 30 * 60e3, 6 * 3600e3, 2 * 86400e3, 6 * 86400e3, 14 * 86400e3];
-  function sageDue() { var ss = sst(), now = Date.now(); return sageGot().filter(function (x) { var b = ss.box[x.id] || 0; return !ss.seen[x.id] || ss.miss[x.id] || now - ss.seen[x.id] >= SG_GAPS[Math.min(b, 5)]; }).length; }
+  function sageDue() { var ss = sst(), now = Date.now(); return sageGot().filter(function (x) { var b = ss.box[x.id] || 0; return !ss.seen[x.id] || ss.miss[x.id] || now - ss.seen[x.id] >= SG_GAPS[Math.min(b, 7)]; }).length; }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
   // Question me: who said it · what it means · when it applies. A miss comes back as a true/false second look, then as a different question.
   function sageQuiz() {
@@ -117,7 +117,7 @@ var WZ = (function () {
       function pick() {
         var now = Date.now(), pool = got.filter(function (x) { return recent.indexOf(x.id) < 0; });
         if (!pool.length) pool = got.slice();
-        pool.forEach(function (x) { var b = ss.box[x.id] || 0, seen = ss.seen[x.id] || 0; x._p = (ss.miss[x.id] ? -3 : 0) + (!seen ? -2 : 0) + (seen && now - seen >= SG_GAPS[Math.min(b, 5)] ? -1 : 0) + b * 0.6 + Math.random() * 1.4; });
+        pool.forEach(function (x) { var b = ss.box[x.id] || 0, seen = ss.seen[x.id] || 0; x._p = (ss.miss[x.id] ? -3 : 0) + (!seen ? -2 : 0) + (seen && now - seen >= SG_GAPS[Math.min(b, 7)] ? -1 : 0) + b * 0.6 + Math.random() * 1.4; });
         pool.sort(function (a, b) { return a._p - b._p; });
         return pool[0];
       }
@@ -352,6 +352,7 @@ var WZ = (function () {
         var dueW = recallDue();
         if (dueW && n % 2 === 0 && act.indexOf(dueW) >= 0) { act.splice(act.indexOf(dueW), 1); act.unshift(dueW); }
         else act.sort(function (a, b) { return (bx[a[0]] || 0) - (bx[b[0]] || 0) + (Math.random() - .5) * 1.6; });
+        var learnable = act.filter(function (x) { return (bx[x[0]] || 0) < 4 || vDue(x); }); if (learnable.length) act = learnable; // mastered words only when due
         var fresh = act.filter(function (x) { return recent.indexOf(x[0]) < 0; }); if (fresh.length) act = fresh;
         var w = act[0], b = bx[w[0]] || 0, ways = vs.ways[w[0]] || { m: 0, f: 0, u: 0 };
         recent.push(w[0]); if (recent.length > 3) recent.shift();
@@ -374,7 +375,7 @@ var WZ = (function () {
           btn.onclick = function () {
             if (done) return; done = true;
             var ok = !!(opts[+btn.dataset.k] || {}).ok; if (ok) right++;
-            if (ok) { ways[mode]++; var allWays = ways.m >= 1 && ways.f >= 1 && ways.u >= 1; bx[w[0]] = Math.min(5, b + 1); if (bx[w[0]] >= 4 && !allWays) bx[w[0]] = 3; }
+            if (ok) { ways[mode]++; var allWays = ways.m >= 1 && ways.f >= 1 && ways.u >= 1; bx[w[0]] = Math.min(7, b + 1); if (bx[w[0]] >= 4 && !allWays) bx[w[0]] = 3; }
             else { bx[w[0]] = Math.max(0, b - 1); vs.missMode = vs.missMode || {}; vs.missMode[w[0]] = mode; }
             if (ok && vs.missMode && vs.missMode[w[0]]) delete vs.missMode[w[0]];
             vs.ways[w[0]] = ways; vs.n++; vs.seen = vs.seen || {}; vs.seen[w[0]] = Date.now(); App.save();
@@ -401,10 +402,13 @@ var WZ = (function () {
     $('#nok', sheet).onclick = function () { App.closeModal(); if (done) done(); };
   }
   // ---------- spaced recall: a quick pop quiz between games ----------
+  // Oct 18: mastered words come back on a growing schedule (2, 5, 14, then 45 days) instead of every 5 days forever
+  var VGAPS = [0, 20 * 60e3, 2 * 3600e3, 12 * 3600e3, 2 * 86400e3, 5 * 86400e3, 14 * 86400e3, 45 * 86400e3];
+  function vDue(w) { var vs = vst(), b = vs.box[w[0]] || 0, seen = (vs.seen || {})[w[0]] || 0; return b >= 1 && Date.now() - seen >= VGAPS[Math.min(b, 7)]; }
   function recallDue() {
     var vs = vst(), bx = vs.box, seen = vs.seen || (vs.seen = {}), now = Date.now();
-    var gaps = [0, 20 * 60e3, 2 * 3600e3, 12 * 3600e3, 2 * 86400e3, 5 * 86400e3]; // by box: how long before it comes back
-    var due = WORDS.filter(function (x) { var b = bx[x[0]] || 0; return b >= 1 && now - (seen[x[0]] || 0) >= gaps[Math.min(b, 5)]; });
+    var gaps = VGAPS; // by box: how long before it comes back
+    var due = WORDS.filter(function (x) { var b = bx[x[0]] || 0; return b >= 1 && now - (seen[x[0]] || 0) >= gaps[Math.min(b, 7)]; });
     due.sort(function (a, b) { return (bx[a[0]] || 0) - (bx[b[0]] || 0); });
     return due[0] || null;
   }
@@ -419,7 +423,7 @@ var WZ = (function () {
       b.onclick = function () {
         if (over) return; over = true;
         var ok = opts[+b.dataset.r] === w;
-        vs.box[w[0]] = ok ? Math.min(5, (vs.box[w[0]] || 0) + 1) : Math.max(1, (vs.box[w[0]] || 1) - 1); App.save();
+        vs.box[w[0]] = ok ? Math.min(7, (vs.box[w[0]] || 0) + 1) : Math.max(1, (vs.box[w[0]] || 1) - 1); App.save();
         $$('[data-r]', sheet).forEach(function (x) { if (opts[+x.dataset.r] === w) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
         $('#rfb', sheet).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', (ok ? 'Still yours. ' : 'It slipped, so it comes back sooner. ') + '“' + esc(w[3]) + '”') + '<button class="btn primary" id="rok" style="width:100%">Back to it</button>';
         $('#rok').onclick = function () { App.closeModal(); done(); };
@@ -431,6 +435,6 @@ var WZ = (function () {
     if (n < 3) return [];
     return [{ sev: Math.min(1, n / 10) * 0.7, text: n + ' Word Duel words you missed last time. Each comes back a different way until you get it.', action: 'Word Duel', go: vocab }];
   }
-  function dueCount() { var vs = vst(), bx = vs.box, seen = vs.seen || {}, now = Date.now(), gaps = [0, 20 * 60e3, 2 * 3600e3, 12 * 3600e3, 2 * 86400e3, 5 * 86400e3]; return WORDS.filter(function (x) { var b = bx[x[0]] || 0; return b >= 1 && now - (seen[x[0]] || 0) >= gaps[Math.min(b, 5)]; }).length; }
+  function dueCount() { var vs = vst(), bx = vs.box, seen = vs.seen || {}, now = Date.now(), gaps = VGAPS; return WORDS.filter(function (x) { var b = bx[x[0]] || 0; return b >= 1 && now - (seen[x[0]] || 0) >= gaps[Math.min(b, 7)]; }).length; }
   return { report: report, today: function () { return pickQ('home'); }, vst: vst, line: line, card: card, library: library, vocab: vocab, WORDS: WORDS, BOOKS: BOOKS, recallModal: recallModal, recallDue: recallDue, dueCount: dueCount, onlineNudge: onlineNudge, wisdomScreen: wisdomScreen, sageQuiz: sageQuiz, quoteLibrary: quoteLibrary, sageTick: sageTick, sageDue: sageDue, sageCount: function () { return sageGot().length; }, sageList: function () { sageStart(); return sageGot(); }, sageAll: function () { return SG; }, sageTotal: SG.length };
 })();

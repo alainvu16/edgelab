@@ -257,6 +257,10 @@ var GL = (function () {
     ["Carte blanche", "Complete freedom to act as you wish", "The new chef was given carte blanche to redo the menu."]
   ];
   EVERYDAY.forEach(function (w) { T.push([w[0], [], 'Everyday', w[1], w[2]]); });
+  // Oct 18: more words (glossmore.js), always appended AFTER the originals so saved progress (keyed by position) stays put.
+  // Inside each area the order is the teaching order: basics first.
+  if (typeof MORE_TERMS !== 'undefined') MORE_TERMS.forEach(function (t) { T.push(t); });
+  if (typeof MORE_EVERYDAY !== 'undefined') MORE_EVERYDAY.forEach(function (w) { T.push([w[0], [], 'Everyday', w[1], w[2]]); });
   var byKey = {}, alts = [];
   T.forEach(function (t, i) { if (t[2] === 'Everyday') return; t[1].concat([t[0]]).forEach(function (a) { var k = a.toLowerCase(); if (!byKey[k]) { byKey[k] = i; alts.push(a); } }); });
   alts.sort(function (a, b) { return b.length - a.length; });
@@ -299,7 +303,39 @@ var GL = (function () {
       n.parentNode.replaceChild(f, n);
     });
   }
-  function gst() { var g = App.S.gloss; if (!g) g = App.S.gloss = { box: {}, tapped: {}, n: 0, ok: 0 }; return g; }
+  function gst() {
+    var g = App.S.gloss; if (!g) g = App.S.gloss = { box: {}, tapped: {}, n: 0, ok: 0 };
+    if (!g.seen) { g.seen = {}; var now = Date.now(); Object.keys(g.box).forEach(function (i) { if (g.box[i] >= 3) g.seen[i] = now; }); } // first review of words mastered before Oct 18: in 3 days, not now
+    return g;
+  }
+  // ---------- progression (Oct 18): new words a few at a time in teaching order; mastered words return on a growing schedule ----------
+  var REVIEW_DAYS = { 3: 3, 4: 10, 5: 30, 6: 90 }, INTAKE = 6, DAY = 86400000;
+  function isNew(i) { var g = gst(); return g.box[i] === undefined && !g.tapped[i]; }
+  function isLearning(i) { var g = gst(); return !isNew(i) && (g.box[i] || 0) < 3; }
+  function isDue(i) { var g = gst(), b = g.box[i] || 0; return b >= 3 && Date.now() - (g.seen[i] || 0) >= REVIEW_DAYS[Math.min(b, 6)] * DAY; }
+  function inArea(area) { return T.map(function (t, i) { return i; }).filter(function (i) { return !area || T[i][2].indexOf(area) >= 0; }); }
+  // ordered candidates for the next question in an area: missed/learning words; the next new word while fewer than INTAKE are in progress;
+  // about 1 in 5 questions a review of a mastered word that's due (oldest first); nothing else
+  function plan(area, skip) {
+    var g = gst(), idx = inArea(area).filter(function (i) { return !skip || skip.indexOf(i) < 0; });
+    var learn = idx.filter(isLearning).sort(function (a, b) { var ta = g.tapped[a] ? -5 : 0, tb = g.tapped[b] ? -5 : 0; return (ta + (g.box[a] || 0) * 2 + Math.random() * 1.5) - (tb + (g.box[b] || 0) * 2 + Math.random() * 1.5); });
+    var fresh = idx.filter(isNew), rev = idx.filter(isDue).sort(function (a, b) { return (g.seen[a] || 0) - (g.seen[b] || 0); });
+    var inProgress = inArea(area).filter(isLearning).length, out = [];
+    if (rev.length && (Math.random() < 0.2 || (!learn.length && !fresh.length))) out.push(rev[0]);
+    if (fresh.length && inProgress < INTAKE) out.push(fresh[0]);
+    out = out.concat(learn);
+    if (!out.length && fresh.length) out.push(fresh[0]);
+    out = out.concat(rev);
+    return out.filter(function (x, k) { return out.indexOf(x) === k; });
+  }
+  function grade(i, ok, mode) { // one place that moves a word forward or back
+    var g = gst(); g.mode = g.mode || {}; g.n++; g.seen[i] = Date.now();
+    if (ok) { g.ok++; g.box[i] = Math.min(6, (g.box[i] || 0) + 1); delete g.mode[i]; }
+    else { g.box[i] = 0; if (mode) g.mode[i] = mode; g.tapped[i] = g.tapped[i] || Date.now(); }
+    App.save();
+  }
+  function nextReviewDays(area) { var g = gst(), m = Infinity; inArea(area).forEach(function (i) { var b = g.box[i] || 0; if (b >= 3) m = Math.min(m, (g.seen[i] || 0) + REVIEW_DAYS[Math.min(b, 6)] * DAY - Date.now()); }); return m === Infinity ? 0 : Math.max(1, Math.ceil(m / DAY)); }
+  function left(area) { return inArea(area).filter(function (i) { return !((gst().box[i] || 0) >= 3) || isDue(i); }).length; } // to learn + due for review
   function show(i) {
     var t = T[i]; if (!t) return;
     try { var g = gst(); g.tapped[i] = Date.now(); g.box[i] = 0; App.save(); } catch (e) {}
@@ -348,12 +384,7 @@ var GL = (function () {
     App.screen('Words to Know', function (v) {
       var g = gst(), n = 0, N = 10, right = 0, recent = [], focus = area || 'Poker';
       g.mode = g.mode || {};
-      function pool() {
-        var idx = T.map(function (t, i) { return i; }).filter(function (i) { return T[i][2].indexOf(focus) >= 0 && recent.indexOf(i) < 0; });
-        // tapped words first, then the weakest, then new ones in teaching order
-        idx.sort(function (a, b) { var ta = g.tapped[a] && (g.box[a] || 0) < 3 ? -5 : 0, tb = g.tapped[b] && (g.box[b] || 0) < 3 ? -5 : 0; return (ta + (g.box[a] || 0) * 2 + a / 1000 + Math.random() * 1.2) - (tb + (g.box[b] || 0) * 2 + b / 1000 + Math.random() * 1.2); });
-        return idx;
-      }
+      function pool() { return plan(focus, recent); }
       function ask() {
         if (n >= N) {
           v.innerHTML = '<div class="panel"><h2>' + right + ' / ' + N + '</h2><p>' + mastered(focus) + ' of ' + T.filter(function (t) { return t[2].indexOf(focus) >= 0; }).length + ' ' + focus.toLowerCase() + ' words mastered (right 3 times, in different ways).</p><div class="btns"><button class="btn primary" id="ag">Another round</button><button class="btn" id="dn">Done</button></div></div>';
@@ -362,6 +393,13 @@ var GL = (function () {
           return;
         }
         var p = pool(); if (!p.length) { recent = []; p = pool(); }
+        if (!p.length) { // everything in this area is learned and no review is due yet
+          var other = AREAS.filter(function (x) { return x !== focus; }).sort(function (x, y) { return left(y) - left(x); })[0];
+          v.innerHTML = '<div class="panel"><h2>' + (n ? right + ' / ' + n : 'All caught up') + '</h2><p>Every ' + focus.toLowerCase() + ' word is learned. The next review comes in ' + nextReviewDays(focus) + ' day' + (nextReviewDays(focus) === 1 ? '' : 's') + ', so nothing repeats before it’s worth it.</p><div class="btns">' + (left(other) ? '<button class="btn primary" id="ot">' + other + ' words (' + left(other) + ' to go)</button>' : '') + '<button class="btn" id="dn">Done</button></div></div>';
+          if ($('#ot', v)) $('#ot', v).onclick = function () { App.checkpoint(function () { App.back(); drill(other); }); };
+          $('#dn', v).onclick = function () { App.checkpoint(App.back); };
+          return;
+        }
         var i = p[0], t = T[i]; recent.push(i);
         // never repeat a word within a few questions, but small areas (Xiangqi) need room to rotate
         var areaSize = T.filter(function (x) { return x[2].indexOf(focus) >= 0; }).length;
@@ -392,8 +430,7 @@ var GL = (function () {
           b.onclick = function () {
             if (answered) return; answered = true;
             var o = opts[+b.dataset.k], ok = !!o && o.j === i;
-            g.n++; if (ok) { g.ok++; right++; g.box[i] = Math.min(5, (g.box[i] || 0) + 1); delete g.mode[i]; } else { g.box[i] = 0; g.mode[i] = mode; g.tapped[i] = g.tapped[i] || Date.now(); }
-            App.save();
+            if (ok) right++; grade(i, ok, mode);
             $$('[data-k]', v).forEach(function (x) { var oo = opts[+x.dataset.k]; if (oo && oo.j === i) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
             $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', '<b>' + App.esc(t[0]) + '</b>' + App.sayBtn(t[0]) + '<br>' + App.esc(t[3]) + (t[4] ? '<br><span class="mute">Example: ' + App.esc(t[4]) + '</span>' : '') + (ok ? '' : '<br><span class="small mute">It comes back in a few questions, asked a different way.</span>')) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
             $('#nx', v).onclick = function () { n++; ask(); };
@@ -414,5 +451,5 @@ var GL = (function () {
   var obs = new MutationObserver(function () { if (pend) return; pend = setTimeout(function () { pend = null; try { wrap(document.getElementById('view')); wrap(document.getElementById('modal')); } catch (e) {} }, 40); });
   function start() { var m = document.getElementById('main'), md = document.getElementById('modal'); if (m) obs.observe(m, { childList: true, subtree: true, characterData: false }); if (md) obs.observe(md, { childList: true, subtree: true }); wrap(document.getElementById('view')); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
-  return { known: function (i) { return (gst().box[i] || 0) >= 3; }, left: function (area) { return T.filter(function (t) { return t[2].indexOf(area) >= 0; }).length - mastered(area); }, report: report, T: T, screen: screen, wrap: wrap, show: show, drill: drill, dueCount: dueCount, mastered: mastered };
+  return { known: function (i) { return (gst().box[i] || 0) >= 3; }, left: left, plan: plan, grade: grade, isNew: isNew, nextReviewDays: nextReviewDays, report: report, T: T, screen: screen, wrap: wrap, show: show, drill: drill, dueCount: dueCount, mastered: mastered };
 })();

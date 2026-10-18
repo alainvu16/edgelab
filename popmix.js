@@ -34,12 +34,18 @@ var POP = (function () {
     },
     word: function () {
       if (typeof GL === 'undefined' || !GL.T || GL.T.length < 4) return null;
-      // skip words you've mastered (right 3 times) unless every word is mastered
-      var idx = GL.T.map(function (t, i) { return i; }), open = idx.filter(function (i) { return !GL.known(i); }), i0 = App.freshPick('popWord', open.length ? open : idx, function (i) { return i; }, 80), x = GL.T[i0], others = shuf(GL.T.filter(function (y) { return y !== x && y[2] === x[2]; })).slice(0, 3);
+      // Oct 18: follows the same progression as Words to Know — words in progress, the next new word in order, or a due review;
+      // never a mastered word that isn't due. Area: one with the most still to do, rotating among those with work.
+      var areas = ['Poker', 'Trading', 'Chess', 'Xiangqi', 'Everyday'].filter(function (a) { return GL.left(a) > 0; });
+      if (!areas.length) return null;
+      var area = areas[(App.S.popWA = ((App.S.popWA || 0) + 1)) % areas.length], skip = (App.S.recent && App.S.recent.popWord || []).map(Number);
+      var cand = GL.plan(area, skip); if (!cand.length) cand = GL.plan(area); if (!cand.length) return null;
+      var i0 = cand[0]; App.recentAdd('popWord', String(i0), 30);
+      var x = GL.T[i0], others = shuf(GL.T.filter(function (y) { return y !== x && y[2] === x[2]; })).slice(0, 3);
       if (others.length < 3) others = shuf(GL.T.filter(function (y) { return y !== x; })).slice(0, 3);
       // hide each term inside its own definition, so the right answer doesn't name the word
       function hide(y) { var t = y[3]; [y[0]].concat(y[1] || []).sort(function (a, b) { return b.length - a.length; }).forEach(function (w) { if (w.length > 1) t = t.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), '___'); }); return t; }
-      return { subj: 'words', label: 'Words to Know · ' + x[2], q: 'What does <b>' + esc(x[0]) + '</b> mean?', opts: [{ t: hide(x), ok: true }].concat(others.map(function (y) { return { t: hide(y), ok: false }; })), teach: x[3] + (x[4] ? ' ' + x[4] : '') };
+      return { subj: 'words', label: 'Words to Know · ' + x[2], q: 'What does <b>' + esc(x[0]) + '</b> mean?', opts: [{ t: hide(x), ok: true }].concat(others.map(function (y) { return { t: hide(y), ok: false }; })), teach: x[3] + (x[4] ? ' ' + x[4] : ''), onAnswer: function (ok) { GL.grade(i0, ok, 'term'); } };
     },
     think: function () {
       if (typeof TH === 'undefined' || !TH.Q || !TH.Q.length) return null;
@@ -70,7 +76,7 @@ var POP = (function () {
     $$('[data-p]', el).forEach(function (b) {
       b.onclick = function () {
         if (over) return; over = true;
-        var i = +b.dataset.p, o = opts[i], ok = !!(o && o.ok), right = opts.filter(function (x) { return x.ok; })[0];
+        var i = +b.dataset.p, o = opts[i], ok = !!(o && o.ok); if (q.onAnswer) q.onAnswer(ok); var right = opts.filter(function (x) { return x.ok; })[0];
         $$('[data-p]', el).forEach(function (x) { var k = +x.dataset.p; if (opts[k] && opts[k].ok) x.classList.add('right'); else if (k === i) x.classList.add('wrong'); x.disabled = true; });
         var text = ok ? (q.teach ? esc(q.teach) : 'Right.') : (i === -9 ? 'The answer: <b>' + esc(right.t) + '</b>. ' : (o && o.why ? esc(o.why) + ' ' : '') + 'The answer: <b>' + esc(right.t) + '</b>. ') + (ok ? '' : esc(q.teach));
         $('#pfb', el).innerHTML = App.coachFor(q.subj, ok ? 'right' : 'wrong', text) + '<button class="btn primary" id="pgo" style="width:100%;margin-top:8px">Continue</button>';
