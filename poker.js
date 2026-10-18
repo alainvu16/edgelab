@@ -490,15 +490,16 @@ var PK = (function () {
       var p = stt();
       var acc = p.dec.all ? Math.round(100 * p.dec.good / p.dec.all) : 0;
       v.innerHTML = '<div><span class="eyebrow">Texas Hold’em</span><h1>Level ' + p.level + ' · ' + title(p.level) + '</h1><p class="mute small">Drill streak ' + p.streak + '/5 to level up · ' + p.right + '/' + p.total + ' correct overall</p></div>' +
-        '<div class="bar"><i style="width:' + (p.streak / 5 * 100) + '%"></i></div>' +
+        '<div class="bar"><i style="width:' + (p.streak / 5 * 100) + '%"></i></div>' + App.playNowBtn('poker') +
         (function () { var r = report()[0]; return '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + r.text + '</p><button class="btn sm" id="repgo">' + r.action + ' ›</button></div>'; })() +
-        '<div class="btns"><button class="btn primary" id="cs">Course</button><button class="btn" id="dr">Train drills</button><button class="btn" id="pl">Play heads-up</button><button class="btn" id="pt">Play a table</button></div>' +
+        '<div class="btns"><button class="btn" id="cs">Course</button><button class="btn" id="dr">Train drills</button><button class="btn" id="pl">Play heads-up</button><button class="btn" id="pt">Play a table</button></div>' +
         (function () { p.course = p.course || {}; var nx = COURSE.findIndex(function (c, i) { return !p.course[i]; }); return nx >= 0 ? '<button class="item" id="cnext"><span class="grow"><span class="t">Next lesson: ' + COURSE[nx].t + '</span><br><span class="s">' + COURSE[nx].u + ' · ' + Object.keys(p.course).length + ' / ' + COURSE.length + ' done</span></span><span class="end">›</span></button>' : ''; })() +
         '<div class="stats"><div class="stat"><span class="v">' + p.hands + '</span><span class="k">Hands played</span></div><div class="stat"><span class="v">' + acc + '%</span><span class="k">Good decisions</span></div><div class="stat"><span class="v">' + (p.chips >= 0 ? '+' : '') + p.chips + '</span><span class="k">Chips won</span></div></div>' +
         '<h2>Quick reference</h2><div class="list">' + LEARN.map(function (k, i) {
           var open = typesFor(p.level).indexOf(k) >= 0 || p.seen[k];
           return '<button class="item' + (open ? '' : ' locked') + '" data-k="' + k + '"><span class="grow"><span class="t">' + INTRO[k][0] + '</span><br><span class="s">' + (open ? 'Tap to read' : 'Unlocks as you level up') + '</span></span><span class="end">' + (open ? '›' : 'locked') + '</span></button>';
         }).join('') + '</div>';
+      App.wirePlayNow(v, 'poker');
       $('#dr', v).onclick = drills;
       $('#cs', v).onclick = course;
       if ($('#cnext', v)) $('#cnext', v).onclick = function () { var nx = COURSE.findIndex(function (c, i) { return !stt().course[i]; }); if (courseOpen(nx)) lessonPK(nx); else course(); };

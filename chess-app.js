@@ -380,9 +380,9 @@ var CZ = (function () {
       var nextL = null; for (var i = 0; i < LESSONS.length; i++) if (!lessonDone(LESSONS[i])) { nextL = i; break; }
       var rep = report()[0];
       var ee = estElo();
-      v.innerHTML = '<div><span class="eyebrow">Chess</span><h1>Est. Elo ' + ee.elo + '</h1><p class="mute small">Puzzle rating ' + c.rating + ' (peak ' + (c.peak || c.rating) + ') · Bot level ' + c.botLevel + ' · ' + c.games.w + 'W ' + c.games.l + 'L ' + c.games.d + 'D · estimate is ' + ee.conf + (ee.conf === 'rough' ? ', play more games to sharpen it' : '') + '</p></div>' +
+      v.innerHTML = '<div><span class="eyebrow">Chess</span><h1>Est. Elo ' + ee.elo + '</h1><p class="mute small">Puzzle rating ' + c.rating + ' (peak ' + (c.peak || c.rating) + ') · Bot level ' + c.botLevel + ' · ' + c.games.w + 'W ' + c.games.l + 'L ' + c.games.d + 'D · estimate is ' + ee.conf + (ee.conf === 'rough' ? ', play more games to sharpen it' : '') + '</p></div>' + App.playNowBtn('chess') +
         '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + rep.text + '</p><button class="btn sm" id="repgo">' + esc(rep.action) + ' ›</button></div>' +
-        '<div class="btns"><button class="btn primary" id="pz">Puzzles</button><button class="btn" id="pl">Play bot</button><button class="btn" id="op">Openings</button><button class="btn" id="bv">Board vision</button><button class="btn" id="eg">Endgames</button><button class="btn" id="ob">Outside the box</button></div>' +
+        '<div class="btns"><button class="btn" id="pz">Puzzles</button><button class="btn" id="pl">Play bot</button><button class="btn" id="op">Openings</button><button class="btn" id="bv">Board vision</button><button class="btn" id="eg">Endgames</button><button class="btn" id="ob">Outside the box</button></div>' +
         '<h2>Curriculum</h2><div class="list" id="ls"></div>';
       var html = '', lastUnit = '';
       LESSONS.forEach(function (l, i) {
@@ -393,6 +393,7 @@ var CZ = (function () {
       });
       $('#ls', v).innerHTML = html;
       $$('[data-l]', v).forEach(function (b) { b.onclick = function () { var i = +b.dataset.l; if (lessonOpen(i)) lesson(i); }; });
+      App.wirePlayNow(v, 'chess');
       $('#pz', v).onclick = function () { puzzles({}); };
       $('#repgo', v).onclick = rep.go;
       $('#pl', v).onclick = playMenu;

@@ -262,15 +262,16 @@ var XQ = (function () {
   function home() {
     App.root('Xiangqi', function (v) {
       var x = st(), ee = estElo();
-      v.innerHTML = '<div><span class="eyebrow">Xiangqi · Chinese chess</span><h1>Est. Elo ' + ee.elo + '</h1><p class="mute small">Bot level ' + x.level + ' · ' + x.games.w + 'W ' + x.games.l + 'L ' + x.games.d + 'D · estimate is ' + ee.conf + (ee.conf === 'rough' ? ', play more games to sharpen it' : '') + '</p></div>' +
+      v.innerHTML = '<div><span class="eyebrow">Xiangqi · Chinese chess</span><h1>Est. Elo ' + ee.elo + '</h1><p class="mute small">Bot level ' + x.level + ' · ' + x.games.w + 'W ' + x.games.l + 'L ' + x.games.d + 'D · estimate is ' + ee.conf + (ee.conf === 'rough' ? ', play more games to sharpen it' : '') + '</p></div>' + App.playNowBtn('xq') +
         (function () { var r = report()[0]; return '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + r.text + '</p><button class="btn sm" id="repgo">' + r.action + ' ›</button></div>'; })() +
-        '<div class="btns"><button class="btn primary" id="pl">Play bot</button><button class="btn" id="dr">Move trainer</button><button class="btn" id="ch">Characters</button>' + (XP.length ? '<button class="btn" id="pz">Puzzles</button>' : '') + (BOOK.length ? '<button class="btn" id="ob">Opening book</button>' : '') + '</div>' +
+        '<div class="btns"><button class="btn" id="pl">Play bot</button><button class="btn" id="dr">Move trainer</button><button class="btn" id="ch">Characters</button>' + (XP.length ? '<button class="btn" id="pz">Puzzles</button>' : '') + (BOOK.length ? '<button class="btn" id="ob">Opening book</button>' : '') + '</div>' +
         '<div class="row"><label class="row small"><input type="checkbox" id="lb"' + (x.labels ? ' checked' : '') + '> Show English letters on pieces</label></div>' +
         '<h2>Learn the game</h2><div class="list">' + LESSONS.map(function (l, i) {
           var d = x.lessons[l.id];
           return '<button class="item' + (d ? ' done' : '') + '" data-l="' + i + '"><span class="grow"><span class="t">' + esc(l.t) + '</span><br><span class="s">' + (l.piece ? 'Rules + tap-the-moves drill' : 'Strategy') + '</span></span><span class="end">' + (d ? '✓' : '›') + '</span></button>';
         }).join('') + '</div>';
       $('#lb', v).onchange = function () { st().labels = this.checked; App.save(); };
+      App.wirePlayNow(v, 'xq');
       $('#pl', v).onclick = playMenu;
       if ($('#ob', v)) $('#ob', v).onclick = book;
       $('#repgo', v).onclick = report()[0].go;

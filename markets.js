@@ -286,10 +286,10 @@ var MK = (function () {
       var acc = m.answered ? Math.round(100 * m.correct / m.answered) : 0;
       var weakest = TOPICS.slice().sort(function (a, b) { return topicSkill(a) - topicSkill(b); });
       v.innerHTML = '<div><span class="eyebrow">Markets · level ' + m.level + '</span><h1>' + titleOf(m.level) + '</h1><p class="mute small">' + m.xp + ' XP · ' + (xpFor(m.level) - m.xp) + ' to ' + titleOf(m.level + 1) + '</p></div>' +
-        '<div class="bar"><i style="width:' + Math.max(0, Math.min(100, lvPct)) + '%"></i></div>' +
+        '<div class="bar"><i style="width:' + Math.max(0, Math.min(100, lvPct)) + '%"></i></div>' + App.playNowBtn('mkt') +
         '<div class="panel"><div class="row"><h3 class="grow">Today: ' + m.today + ' / ' + m.goal + ' questions</h3>' + (m.today >= m.goal ? '<span class="pill good">Goal hit</span>' : '') + '</div><div class="bar"><i style="width:' + Math.min(100, m.today / m.goal * 100) + '%;background:var(--good)"></i></div></div>' +
         (function () { var r = report()[0]; return '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + r.text + '</p><button class="btn sm" id="repgo">' + r.action + ' ›</button></div>'; })() +
-        '<div class="btns"><button class="btn primary" id="go">Keep learning</button><button class="btn" id="rp">Rapid fire</button><button class="btn" id="sm">Chart practice</button></div>' +
+        '<div class="btns"><button class="btn" id="go">Keep learning</button><button class="btn" id="rp">Rapid fire</button><button class="btn" id="sm">Chart practice</button></div>' +
         (typeof TB !== 'undefined' ? '<button class="item" id="tbs" style="border-color:var(--accent)"><span class="grow"><span class="t">ToneBot School</span><br><span class="s">' + (TB.count() ? 'Learn your own bot: ' + TB.done() + ' of ' + TB.count() + ' lessons · Rotation Replay · beat its daily call' : 'Learn your own bot · private, loads from your GitHub backup') + '</span></span><span class="end">›</span></button>' : '') +
         '<div class="list"><button class="item" id="mo"><span class="grow"><span class="t">Momentum Lab</span><br><span class="s">Sector rotation course + replay on real data 2013–' + MKT_DATA.asof.slice(0, 4) + '</span></span><span class="end">›</span></button>' +
         '<button class="item" id="mc"><span class="grow"><span class="t">Macro Desk</span><br><span class="s">How world events reach prices · real episodes</span></span><span class="end">›</span></button>' +
@@ -302,6 +302,7 @@ var MK = (function () {
         }).join('') + '</div>' +
         '<p class="small mute">Questions adapt: missed ones come back, weak topics show up more, and harder questions unlock as you rank up. Focus now: ' + weakest[0] + ' and ' + weakest[1] + '. Learning material, not investment advice.</p>';
       $('#go', v).onclick = function () { App.screen('Learning', function (vv) { runQuiz(vv, 0, function () {}); }); };
+      App.wirePlayNow(v, 'mkt');
       $('#rp', v).onclick = rapid;
       $('#repgo', v).onclick = report()[0].go;
       $('#sm', v).onclick = simScreen;

@@ -499,6 +499,7 @@ var App = (function () {
     return a;
   }
   function qpPick() {
+    if (QP.only && mods[QP.only] && mods[QP.only].quick) return sectionPick(QP.only);
     if (QP.edge > 0 && typeof EG !== 'undefined') { var ea = edgePick(); if (ea) return ea; }
     var prog = { chess: ((S.chess.rating || 800) - 600) / 1400, xq: ((S.xq.level || 1) - 1) / 7, poker: ((S.poker.level || 1) - 1) / 11, mkt: ((S.mkt.level || 1) - 1) / 7 };
     var due = (typeof WZ !== 'undefined') ? WZ.dueCount() : 0;
@@ -520,10 +521,20 @@ var App = (function () {
       if (!best || score > best.score) best = { k: k, score: score };
     });
     /* Oct 17: learn in order — 8 of 10 picks are the next step on the path, the rest is variety */ if (typeof RM !== 'undefined' && Math.random() < 0.8) { try { var ns = RM.nextStep(best.k); if (ns && ns.label !== QP.lastLabel) return { k: best.k, label: ns.label, why: 'Next step on your path to an edge.', go: ns.go, quota: 3 }; } catch (e) {} }
-    var list = mods[best.k].quick().filter(function (a) { return a.label !== QP.lastLabel; });
+    var a = weighted(mods[best.k].quick().filter(function (a) { return a.label !== QP.lastLabel; }));
+    a.k = best.k; return a;
+  }
+  // weighted random pick from a subject's quick() list (w = weight, default 1)
+  function weighted(list) {
     var tot = list.reduce(function (s, a) { return s + (a.w || 1); }, 0), r = Math.random() * tot, a = list[0];
     for (var i = 0; i < list.length; i++) { r -= (list[i].w || 1); if (r <= 0) { a = list[i]; break; } }
-    a.k = best.k; return a;
+    return a;
+  }
+  // Play now inside one section (Oct 18): stays in that subject, mostly the next step on its path, the rest from its own mix
+  function sectionPick(k) {
+    if (typeof RM !== 'undefined' && Math.random() < 0.6) { try { var ns = RM.nextStep(k); if (ns && ns.label !== QP.lastLabel) return { k: k, label: ns.label, why: 'Next step on your ' + qname(k) + ' path.', go: ns.go, quota: 3 }; } catch (e) {} }
+    var all = mods[k].quick(), list = all.filter(function (a) { return a.label !== QP.lastLabel; });
+    var a = weighted(list.length ? list : all); a.k = k; return a;
   }
   function qpLaunch(a) {
     if (['poker', 'mkt', 'chess', 'xq'].indexOf(a.k) >= 0) QP.lastK = a.k; QP.last = a.k; QP.lastLabel = a.label; QP.count = 0; QP.quota = a.quota || 1; QP.start = Date.now(); QP.n++;
@@ -534,14 +545,21 @@ var App = (function () {
     a.go();
     toast('Quick play · ' + a.label);
   }
-  function quickPlay(edge) {
-    S.qpOn = 1; save();
-    QP.active = true; QP.limitNoted = false; QP.blocks = {}; QP.n = 0; QP.last = null; QP.lastLabel = ''; QP.edge = edge ? 4 : 0;
+  function quickPlay(edge, only) {
+    S.qpOn = 1; S.qpOnly = only || null; save();
+    QP.active = true; QP.only = only || null; QP.limitNoted = false; QP.blocks = {}; QP.n = 0; QP.last = null; QP.lastLabel = ''; QP.edge = edge ? 4 : 0;
     qpLaunch(qpPick());
   }
+  // section Play now: one button at the top of Chess / Xiangqi / Poker / Markets
+  function playNow(k) { quickPlay(false, k); }
+  function playNowBtn(k) {
+    var on = QP.active && QP.only === k;
+    return '<button class="btn primary hqp" id="playnow">' + (on ? 'Keep playing' : 'Play now') + '<span>' + (on ? qname(k) + ' only · keeps going until you stop' : 'Picks your next step and keeps going until you stop') + '</span></button>';
+  }
+  function wirePlayNow(v, k) { var b = $('#playnow', v); if (b) b.onclick = function () { if (QP.active && QP.only === k) qpNext(); else playNow(k); }; }
   function qpNext() { qpLaunch(qpPick()); }
-  function edgeCheck() { closeModal(); if (QP.active) { QP.edge = 4; qpNext(); } else quickPlay(true); }
-  function qpStop() { QP.active = false; FADE.run = 0; S.qpOn = 0; save(); closeModal(); toast('Quick play stopped'); header(stack.length ? stack[stack.length - 1].title : 'Home', stack.length > 1); }
+  function edgeCheck() { closeModal(); QP.only = null; S.qpOnly = null; if (QP.active) { QP.edge = 4; qpNext(); } else quickPlay(true); }
+  function qpStop() { QP.active = false; QP.only = null; S.qpOnly = null; FADE.run = 0; S.qpOn = 0; save(); closeModal(); toast('Quick play stopped'); header(stack.length ? stack[stack.length - 1].title : 'Home', stack.length > 1); }
   var QP_WAIT = 4000; // ms before the next block starts by itself
   function qpBlockDone(done, left) {
     if (typeof EG !== 'undefined' && EG.fullDay(answersToday())) {
@@ -803,7 +821,7 @@ var App = (function () {
       $$('[data-go]', v).forEach(function (b) { b.onclick = function () { tab(b.dataset.go); }; });
       $$('[data-wk]', v).forEach(function (b) { b.onclick = function () { focusCache[+b.dataset.wk].r.go(); }; });
       $('#sets', v).onclick = settingsScreen; if ($('#rsc', v)) $('#rsc', v).onclick = backupScreen;
-      $('#qp', v).onclick = function () { if (QP.active) qpNext(); else quickPlay(); };
+      $('#qp', v).onclick = function () { if (QP.active && !QP.only) qpNext(); else quickPlay(); };
       if ($('#edgechip', v)) $('#edgechip', v).onclick = function () { EG.screen(edgeCheck); };
       if ($('#spx', v)) $('#spx', v).onclick = spxSheet;
       if (typeof EG !== 'undefined' && !$('#modal').innerHTML && !EG.welcome(edgeCheck)) EG.monthlyOffer();
@@ -898,7 +916,7 @@ var App = (function () {
         dial('poker', '&#9824;&#xFE0E;', 'Poker', 'Lv ' + ((S.poker && S.poker.level) || 1), path.poker || 0) +
         dial('xq', '炮', 'Xiangqi', xel, path.xq || 0, true) +
       '</div>' +
-      '<button class="btn primary hqp" id="qp">' + (QP.active ? 'Resume quick play' : 'Quick play') + '<span>' + (QP.active ? 'Keeps rotating what you need most until you stop it' : 'The app picks what you need most and keeps rotating until you stop') + '</span></button>' +
+      '<button class="btn primary hqp" id="qp">' + (QP.active && !QP.only ? 'Resume quick play' : 'Quick play') + '<span>' + (QP.active && !QP.only ? 'Keeps rotating what you need most until you stop it' : 'The app picks what you need most and keeps rotating until you stop') + '</span></button>' +
       '</section>';
   }
   function item(go, ic, t, s) {
@@ -943,7 +961,7 @@ var App = (function () {
     load();
     App.S = S;
     applySkin();
-    if (S.qpOn) QP.active = true; // quick play was on when the app closed: Home offers Resume
+    if (S.qpOn) { QP.active = true; QP.only = S.qpOnly || null; } // quick play was on when the app closed: Home offers Resume
     $$('#tabs button').forEach(function (b) { b.onclick = function () { tab(b.dataset.tab); }; });
     setInterval(tick, 1000);
     setInterval(function () { if (cloudDoc) cloudPush(); }, 60000);
@@ -958,6 +976,6 @@ var App = (function () {
     backupScreen: backupScreen, idkBtn: idkBtn, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
-    st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
+    st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, playNow: playNow, playNowBtn: playNowBtn, wirePlayNow: wirePlayNow, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
   };
 })();
