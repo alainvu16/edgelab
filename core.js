@@ -430,6 +430,7 @@ var App = (function () {
       '<div class="btns">' + opts.map(function (m) { return '<button class="btn' + (ss.active && ss.limit === m ? ' primary' : '') + '" data-m="' + m + '">' + m + ' min</button>'; }).join('') + '</div>' +
       '<h3>Market breaks</h3><p class="mute small">A short trading quiz after every stretch of play.</p>' +
       '<div class="seg" id="bev">' + [8, 12, 20, 0].map(function (m) { return '<button aria-pressed="' + (S.breakEvery === m) + '" data-b="' + m + '">' + (m ? 'Every ' + m + ' min' : 'Off') + '</button>'; }).join('') + '</div>' +
+      '<h3>Look</h3><div class="seg" id="skn">' + [['classic', 'Classic'], ['future', 'Mission console']].map(function (o) { return '<button aria-pressed="' + ((S.skin || 'classic') === o[0]) + '" data-look="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div>' +
       '<h3>Full-day nudge</h3><p class="mute small">In quick play, once a day after this many answers, a suggestion to stop for the day.</p>' +
       '<div class="seg" id="fdn">' + [120, 180, 250, 0].map(function (m) { var cur = S.fullDay == null ? 180 : S.fullDay; return '<button aria-pressed="' + (cur === m) + '" data-fd="' + m + '">' + (m ? m + ' answers' : 'Off') + '</button>'; }).join('') + '</div>' +
       (sampleFn ? '<h3>Explain like I’m 5</h3><div class="seg" id="simps">' + [['off', 'Button only'], ['wrong', 'When I’m wrong'], ['always', 'Always']].map(function (o) { return '<button aria-pressed="' + ((S.simple || 'wrong') === o[0]) + '" data-sm="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div><p class="mute small">Rewrites coach notes in kid-simple words using Claude (needs a connection).</p>' : '') +
@@ -438,6 +439,7 @@ var App = (function () {
       '<button class="btn ghost" id="cls">Close</button>');
     $$('#modal [data-m]').forEach(function (b) { b.onclick = function () { startSession(+b.dataset.m); closeModal(); }; });
     $$('#modal [data-b]').forEach(function (b) { b.onclick = function () { S.breakEvery = +b.dataset.b; save(); sessionSheet(); }; });
+    $$('#modal [data-look]').forEach(function (b) { b.onclick = function () { S.skin = b.dataset.look; save(); applySkin(); sessionSheet(); }; });
     $$('#modal [data-fd]').forEach(function (b) { b.onclick = function () { S.fullDay = +b.dataset.fd; save(); sessionSheet(); }; });
     $$('#modal [data-sm]').forEach(function (b) { b.onclick = function () { S.simple = b.dataset.sm; save(); sessionSheet(); }; });
     $$('#modal [data-fx]').forEach(function (b) { b.onclick = function () { S.fx = b.dataset.fx === '1'; save(); sessionSheet(); if (S.fx) celebrate('level'); }; });
@@ -930,6 +932,8 @@ var App = (function () {
     }).catch(function () { return syncEngine(m); });
   }
 
+  // Look: 'classic' (default) or 'future' (mission console, future.css). Saved with progress.
+  function applySkin() { var k = S && S.skin === 'future' ? 'future' : ''; if (k) document.documentElement.setAttribute('data-skin', k); else document.documentElement.removeAttribute('data-skin'); var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', k ? '#0a0f2e' : '#11141c'); }
   function boot() {
     getWorker();
     setTimeout(cloudInit, 0);
@@ -938,6 +942,7 @@ var App = (function () {
     simpObs.observe(document.body, { childList: true, subtree: true });
     load();
     App.S = S;
+    applySkin();
     if (S.qpOn) QP.active = true; // quick play was on when the app closed: Home offers Resume
     $$('#tabs button').forEach(function (b) { b.onclick = function () { tab(b.dataset.tab); }; });
     setInterval(tick, 1000);
