@@ -26,7 +26,7 @@ var RM = (function () {
           { label: 'Macro Desk: all chains', p: function () { return frac(cnt(((S().mkt.mc) || {}).lesson), MC.CHAINS.length); }, go: function () { MC.home(); } },
           { label: 'Read 15 real months (60%+ right)', p: function () { var t = S().mkt.tp || {}; return Math.min(frac(t.reads, 15), t.reads ? frac(t.right / t.reads, 0.6) : 0); }, go: function () { TP.readMonth(); } },
           { label: 'Call 12 historical events', p: function () { return frac(((S().mkt.mc) || {}).total, 12); }, go: function () { MC.eventReplay(); } },
-          tbStep('ToneBot course: Your bot', 'Your bot', 'Every rule in ToneBot, one idea at a time (🧪 untested: how it trades, not proof it wins).')
+          tbStep('ToneBot course: Your bot', 'Your bot', 'Every rule in ToneBot, one idea at a time (◇ untested: how it trades, not proof it wins).')
         ] },
         { t: 'Strategy', why: 'Momentum and sector rotation: rules, backtests, and why each strategy wins and fails.', steps: [
           { label: 'Momentum Lab: all lessons', p: function () { return frac(cnt(((S().mkt.mo) || {}).lesson), MO.LESSONS.length); }, go: function () { MO.home(); } },
@@ -40,7 +40,7 @@ var RM = (function () {
           { label: 'Write your trading system', why: 'Universe, signal, filter, rebalance, size, exit. Every field filled.', p: function () { var y = S().mkt.system || {}; return frac(SYS.filter(function (f) { return (y[f[0]] || '').trim().length > 3; }).length, SYS.length); }, go: system },
           { label: 'Paper trade 12 weekly journal entries', why: 'Log what the rules say and what you did, every week (Market Now journal).', p: function () { return frac((S().mkt.journal || []).length, 12); }, go: function () { MO.now(); } },
           tbStep('ToneBot course: How ToneBot is built', 'How ToneBot is built', 'Tech meets trading: data, tests, servers, guardrails.'),
-          tbStep('ToneBot course: Uncle school', 'Uncle school', 'His strategy, tested (🧪 still in the lab).'),
+          tbStep('ToneBot course: Uncle school', 'Uncle school', 'His strategy, tested (◇ still in the lab).'),
           selfStep('mkt_review', 'Compare paper results with the backtest', 'Same rules, similar results? If not, find out why before risking money.'),
           selfStep('mkt_small', 'Go live small: risk 1% or less per position', 'Only after the paper results hold. Size so a full losing streak is survivable.')
         ] }

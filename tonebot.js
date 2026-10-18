@@ -1,8 +1,11 @@
 // ===================== TONEBOT SCHOOL: learn the bot you built =====================
 // Engine only: the lessons and the bot's nightly facts load privately (see refresh below).
 var TB = (function () {
-  var $ = App.$, $$ = App.$$, esc = App.esc;
-  var TAGS = { proven: ['good', '✅ Proven'], half: ['warn', '🟡 Half-proven'], no: ['bad', '❌ Not proven'], rule: ['ok', '📘 Your rule'] };
+  // No emojis (Alain, Oct 17): the bot's own text arrives with some, so every piece is drawn with plain symbols instead.
+  var SYM = { '✅': '✓', '❌': '✕', '📘': '§', '🧪': '◇', '🔒': '⊘', '🟢': '●', '🔴': '●', '🟡': '◐', '⬆': '▲', '⬇': '▼', '💪': '▲', '🎯': '◎', '☀': '☼', '📚': '≡', '⚠': '!', '📈': '▲', '📉': '▼', '🔥': '▲', '⭐': '★' };
+  function sym(t) { return String(t == null ? '' : t).replace(/[\u2600-\u27BF\u2B00-\u2BFF]\uFE0F|[\u{1F000}-\u{1FAFF}]/gu, function (m) { var k = m.replace('\uFE0F', ''); return SYM[k] != null ? SYM[k] : SYM[m] != null ? SYM[m] : ''; }).replace(/\uFE0F/g, '').replace(/[✅❌⬆⬇☀⚠⭐]/g, function (m) { return SYM[m]; }); }
+  var $ = App.$, $$ = App.$$, esc = function (x) { return App.esc(sym(x)); };
+  var TAGS = { proven: ['good', '✓ Proven'], half: ['warn', '◐ Half-proven'], no: ['bad', '✕ Not proven'], rule: ['ok', '§ Your rule'] };
   // Lessons and live bot facts are PRIVATE: they load from Alain's private repo (edgelab-data) with the
   // phone's own GitHub key, and are cached on the phone for offline. Nothing ToneBot-specific is in this public file.
   var L = [], T = null, CK = 'edgelab.tb.cache', C = null, CCK = 'edgelab.tb.course';
@@ -33,9 +36,9 @@ var TB = (function () {
       refresh(function (ch) { if (ch && document.querySelector('.tb-home')) { App.back(); home(); } });
       v.innerHTML = '<div class="tb-home"><span class="eyebrow">Learn the bot you built</span><h1>ToneBot School</h1><p class="mute small">Your momentum + sector-rotation strategy, taught from ToneBot’s own lab results. Every lesson says how proven it is. ' + n + ' of ' + L.length + ' lessons done.</p></div>' +
         botPanel(T, s) +
-        '<button class="item" id="mc" style="border-color:var(--accent)"><span class="grow"><span class="t">☀️ Daily drill: you vs ToneBot</span><br><span class="s">' + esc(drillStatus()) + ' · ' + esc(recShort()) + '</span></span><span class="end">›</span></button>' +
+        '<button class="item" id="mc" style="border-color:var(--accent)"><span class="grow"><span class="t">☼ Daily drill: you vs ToneBot</span><br><span class="s">' + esc(drillStatus()) + ' · ' + esc(recShort()) + '</span></span><span class="end">›</span></button>' +
                 '<div class="btns"><button class="btn" id="rr">Rotation Replay: you vs the bot</button></div>' +
-        (hasCourse() ? '<button class="item" id="lc" style="border-color:var(--accent)"><span class="grow"><span class="t">📚 ToneBot course</span><br><span class="s">Read a lesson, then quiz it · ' + courseLessons().filter(lessonDone).length + ' of ' + courseLessons().length + ' lessons done · in order</span></span><span class="end">›</span></button>' : '') +
+        (hasCourse() ? '<button class="item" id="lc" style="border-color:var(--accent)"><span class="grow"><span class="t">≡ ToneBot course</span><br><span class="s">Read a lesson, then quiz it · ' + courseLessons().filter(lessonDone).length + ' of ' + courseLessons().length + ' lessons done · in order</span></span><span class="end">›</span></button>' : '') +
         '<h2>Lessons</h2><div class="list">' + L.map(function (l, i) { var tg = TAGS[l.tag]; return '<button class="item" data-l="' + i + '"><span class="grow"><span class="t">' + esc(l.t) + '</span><br><span class="s">' + tg[1] + '</span></span><span class="end">' + (s.done[l.id] ? '✓' : '›') + '</span></button>'; }).join('') + '</div>' +
         '<p class="small mute">Learning only. Nothing here changes what ToneBot trades. Market questions are for learning, not investment advice.</p>';
       $$('[data-l]', v).forEach(function (b) { b.onclick = function () { lesson(+b.dataset.l); }; });
@@ -141,7 +144,7 @@ var TB = (function () {
   // Data: tonebot-course.json (blocks = the course text in order, quiz = 294 multiple-choice questions with a 'why' per choice).
   // Order = the course's own order (track → level → lesson). A missed question comes back as a true/false "second look",
   // then once more as the full question; a lesson is done when all its questions are learned.
-  function splitT(x) { var m = String(x || '').match(/^(.*?)\s—\s((?:📘|🧪|✅|🔒).*)$/u); return m ? [m[1], m[2]] : [String(x || ''), '']; }
+  function splitT(x) { var m = String(x || '').match(/^(.*?)\s—\s((?:📘|🧪|✅|🔒|§|◇|✓|⊘).*)$/u); return m ? [m[1], m[2]] : [String(x || ''), '']; }
   function courseTracks() {
     var out = [], cur = null;
     ((C && C.blocks) || []).forEach(function (b) { if (b[0] === 'h1') { cur = { t: b[1], b: [] }; out.push(cur); } else if (cur) cur.b.push(b); });
@@ -262,7 +265,7 @@ var TB = (function () {
   function course() {
     App.screen('ToneBot course', function (v) {
       var tr = courseTracks(), ls = courseLessons(), done = ls.filter(lessonDone).length;
-      v.innerHTML = '<div><span class="eyebrow">ToneBot · updated ' + esc((C && C.updated) || '') + '</span><h1>ToneBot course</h1><p class="mute small">Read a lesson, then answer its questions. 📘 general knowledge · 🧪 UNTESTED: how the bot trades, not proven to win · ✅ PROVEN: passed the bot’s tests.</p></div>' +
+      v.innerHTML = '<div><span class="eyebrow">ToneBot · updated ' + esc((C && C.updated) || '') + '</span><h1>ToneBot course</h1><p class="mute small">Read a lesson, then answer its questions. § general knowledge · ◇ UNTESTED: how the bot trades, not proven to win · ✓ PROVEN: passed the bot’s tests.</p></div>' +
         (ls.length ? '<button class="btn primary" id="cont" style="width:100%">' + (ls.filter(lessonSeen).length ? 'Continue · ' + ls.filter(lessonSeen).length + ' of ' + ls.length + ' lessons read · ' + done + ' fully learned' : 'Start lesson 1 of ' + ls.length) + '</button>' : '') +
         '<div class="list">' + tr.map(function (t, i) { var nm = splitT(t.t), mine = ls.filter(function (l) { return l.track === nm[0]; }), d = mine.filter(lessonDone).length; return '<button class="item" data-t="' + i + '"><span class="grow"><span class="t">' + esc(nm[0]) + '</span><br><span class="s">' + esc(nm[1]) + ' · ' + (mine.length ? d + ' of ' + mine.length + ' lessons' : t.b.length + ' entries') + '</span></span><span class="end">›</span></button>'; }).join('') + '</div>' +
         '<p class="small mute">Learning only, not advice for real money.</p>';
@@ -348,7 +351,7 @@ var TB = (function () {
       want === 'why' ? 'Your group lagged SPY. Back to how the strategy picks leaders.' : want === 'breaker' ? 'You missed the tape. See how the bot protects itself on red days.' : want === 'unseen' ? 'You missed the 10-year. One day is noise: judge rules on many days.' : 'Clean sweep. Keep going with your next lesson.';
     return i < 0 ? null : { i: i, why: why };
   }
-  function yn(x) { return x == null ? '<span class="mute">—</span>' : x ? '✅' : '❌'; }
+  function yn(x) { return x == null ? '<span class="mute">—</span>' : x ? '<span style="color:var(--good)">✓</span>' : '<span style="color:var(--bad)">✕</span>'; }
   function line(ok, label, detail) {
     return '<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)"><span style="width:20px;flex:none">' + yn(ok) + '</span><div class="grow" style="min-width:0"><b class="small">' + label + '</b><div class="small mute" style="overflow-wrap:anywhere">' + detail + '</div></div><span class="mono small" style="flex:none">' + (ok ? '+25' : '0') + '</span></div>';
   }
@@ -385,7 +388,7 @@ var TB = (function () {
       if (a) {
         var c = botCall(day);
         v.innerHTML = top + '<div class="panel"><span class="eyebrow">Locked ' + new Date(a.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '</span><p><b>' + esc(a.group) + '</b> leads · tape <b>' + esc(a.tape) + '</b> · 10-yr <b>' + esc(a.tnx) + '</b> · idea <b>' + esc(a.idea) + '</b> (' + esc(a.mode) + ')</p>' +
-          '<p class="small">' + (c ? '☀️ <b>ToneBot’s call:</b> ' + esc(c.lead) + ' leads, ' + esc(c.lag) + ' lags' + (c.conf ? ' @ ' + Math.round(c.conf * 100) + '%' : '') : 'ToneBot’s morning call shows here once it syncs (around 9:40 AM ET).') + '</p>' +
+          '<p class="small">' + (c ? '☼ <b>ToneBot’s call:</b> ' + esc(c.lead) + ' leads, ' + esc(c.lag) + ' lags' + (c.conf ? ' @ ' + Math.round(c.conf * 100) + '%' : '') : 'ToneBot’s morning call shows here once it syncs (around 9:40 AM ET).') + '</p>' +
           '<p class="small mute">Graded after the close, once the evening sync lands.</p></div>' + tail;
         wire(); return;
       }
@@ -393,11 +396,11 @@ var TB = (function () {
       function ask() {
         var q;
         if (step === 0) q = '<h3>1 of 4 · Which group leads today (beats SPY the most)?</h3><div class="btns">' + names.map(function (n) { return '<button class="btn sm" data-v="' + esc(n) + '">' + esc(n) + ' <span class="mute">' + esc(g[n]) + '</span></button>'; }).join('') + '</div>';
-        else if (step === 1) q = '<h3>2 of 4 · Tape: red or green?</h3><p class="small mute">Green = at least 2 of SPY, DIA, IWM close up.</p><div class="btns"><button class="btn" data-v="green">🟢 Green</button><button class="btn" data-v="red">🔴 Red</button></div>';
-        else if (step === 2) q = '<h3>3 of 4 · 10-year yield: up or down?</h3><div class="btns"><button class="btn" data-v="up">⬆️ Up</button><button class="btn" data-v="down">⬇️ Down</button></div>';
+        else if (step === 1) q = '<h3>2 of 4 · Tape: red or green?</h3><p class="small mute">Green = at least 2 of SPY, DIA, IWM close up.</p><div class="btns"><button class="btn" data-v="green"><span style="color:var(--good)">●</span> Green</button><button class="btn" data-v="red"><span style="color:var(--bad)">●</span> Red</button></div>';
+        else if (step === 2) q = '<h3>3 of 4 · 10-year yield: up or down?</h3><div class="btns"><button class="btn" data-v="up">▲ Up</button><button class="btn" data-v="down">▼ Down</button></div>';
         else q = '<h3>4 of 4 · One buy idea</h3><p class="small mute">A ticker that will beat SPY today, and why: strength (breakout) or dip.</p>' +
           '<input id="tk" placeholder="Ticker, e.g. XLE" maxlength="6" autocapitalize="characters" autocorrect="off" spellcheck="false" style="width:100%;box-sizing:border-box;background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:10px;font:15px var(--mono, monospace);text-transform:uppercase">' +
-          '<div class="btns"><button class="btn" data-v="strength">💪 Strength</button><button class="btn" data-v="dip">🎯 Dip</button></div><p class="small" id="msg"></p>';
+          '<div class="btns"><button class="btn" data-v="strength">▲ Strength</button><button class="btn" data-v="dip">▼ Dip</button></div><p class="small" id="msg"></p>';
         v.innerHTML = top + '<div class="panel">' + q + (step ? '<button class="btn sm ghost" id="bk">‹ Back</button>' : '') + '</div>' + tail;
         wire();
         if ($('#bk', v)) $('#bk', v).onclick = function () { step--; ask(); };
