@@ -1,0 +1,64 @@
+name: Weekly market data refresh
+
+on:
+  schedule:
+    # Sundays 7:05 PM ET (23:05 UTC in winter, 00:05 UTC Monday in summer)
+    - cron: "5 23 * * 0"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -q yfinance
+
+      - name: Regenerate mktdata.js and tapedata.js
+        run: |
+          python3 - <<'EOF'
+          import yfinance as yf, json, math
+          SECT=['XLK','XLF','XLV','XLE','XLY','XLP','XLI','XLU','XLB','XLRE','XLC']
+          BENCH=['SPY','QQQ','IWM','TLT','GLD','BIL']
+          STOCKS=['AAPL','MSFT','NVDA','AMZN','GOOGL','META','TSLA','JPM','XOM','UNH','COST','NFLX','AMD','PLTR','BRK-B']
+          tick=SECT+BENCH+STOCKS
+          m=yf.download(tick,start='2012-01-01',interval='1mo',auto_adjust=True,progress=False)['Close'].dropna(how='all')
+          w=yf.download(SECT+['SPY','QQQ','IWM','GLD','TLT']+STOCKS,period='2y',interval='1wk',auto_adjust=True,progress=False)['Close'].dropna(how='all')
+          def pack(df,fmt):
+              out={'dates':[d.strftime(fmt) for d in df.index],'px':{}}
+              for c in df.columns:
+                  out['px'][c]=[None if (isinstance(v,float) and math.isnan(v)) else round(float(v),2) for v in df[c].tolist()]
+              return out
+          data={'monthly':pack(m,'%Y-%m'),'weekly':pack(w,'%Y-%m-%d'),'asof':m.index[-1].strftime('%Y-%m-%d'),'sectors':SECT,'bench':BENCH,'stocks':STOCKS}
+          # sanity checks: refuse to overwrite good data with a bad download
+          assert len(data['monthly']['dates'])>=170, 'too few monthly dates'
+          spy=data['monthly']['px']['SPY'][-1]; assert spy and spy>0, 'bad SPY'
+          open('mktdata.js','w').write('var MKT_DATA='+json.dumps(data,separators=(',',':'))+';\n')
+          T=['^TNX','UUP','USO','^VIX','HYG','EEM','CPER','SMH','KRE','XHB','JETS','IYT','DBC']
+          t=yf.download(T,start='2012-01-01',interval='1mo',auto_adjust=True,progress=False)['Close'].dropna(how='all')
+          tout={'dates':[d.strftime('%Y-%m') for d in t.index],'px':{}}
+          for c in t.columns:
+              tout['px'][c.replace('^','')]=[None if (isinstance(v,float) and math.isnan(v)) else round(float(v),3) for v in t[c].tolist()]
+          assert len(tout['dates'])>=170, 'too few tape dates'
+          tnx=tout['px']['TNX'][-1]; assert tnx and tnx>0, 'bad TNX'
+          open('tapedata.js','w').write('var TAPE_DATA='+json.dumps(tout,separators=(',',':'))+';\n')
+          open('asof.txt','w').write(data['asof'])
+          print(len(m), data['asof'], len(t))
+          EOF
+
+      - name: Commit and push if changed
+        run: |
+          ASOF=$(cat asof.txt); rm -f asof.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mktdata.js tapedata.js
+          git diff --cached --quiet && { echo "no change"; exit 0; }
+          git commit -m "Weekly market data refresh (asof $ASOF)"
+          git push
