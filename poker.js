@@ -1224,8 +1224,47 @@ var PK = (function () {
     out.push({ label: 'Heads-up vs ' + BOTS[Math.min(P.bot, BOTS.length) - 1].name, why: 'Table coach on: outs, odds and what beats you before every decision.', go: function () { play(BOTS[Math.min(P.bot, BOTS.length) - 1], false); }, quota: 6, w: 1.1 });
     return out;
   }
-  if (typeof App !== 'undefined') App.reg('poker', { home: home, place: place, report: report, quick: quick });
+  // ---------- baseline test (Oct 18): climbs the 12 drill levels one question at a time; a miss gets one more try at that level,
+  // two misses at a level stop it. Levels you clear set your drill level, mark their skills seen and their course lessons done.
+  function baseline() {
+    var lv = 1, missHere = 0, cleared = 0, n = 0, usedT = {};
+    App.screen('Poker baseline', function (v) {
+      v.innerHTML = '<div><span class="eyebrow">Baseline · about 5 minutes</span><h1>Find your poker level</h1></div><div class="prose"><ul><li>Questions climb from hand rankings to pot odds, ranges and bet sizing.</li><li>Clear a level and its lessons count as done. Two misses on one level and the test stops there: that’s where you start.</li><li>Every question lists the poker words in it. “I don’t know” is fine.</li></ul></div><button class="btn primary" id="blgo" style="width:100%">Start</button>';
+      $('#blgo', v).onclick = ask;
+      function ask() {
+        if (lv > 12 || missHere >= 2) return done();
+        var types = typesFor(lv), fresh = types.filter(function (t) { return !usedT[lv + t]; }), t = pick(fresh.length ? fresh : types); usedT[lv + t] = 1; n++;
+        var q = GEN[t]();
+        v.innerHTML = '<div class="row"><span class="pill acc">Baseline · level ' + lv + '</span><span class="pill">' + INTRO[t][0] + '</span><span class="grow"></span><span class="small mute">' + n + '</span></div>' + qTable(q) + '<h3>' + q.q + '</h3>' + KW([q.q].concat(q.opts)) + '<div class="list">' + q.opts.map(function (o, k) { return '<button class="btn opt" data-k="' + k + '">' + o + '</button>'; }).join('') + App.idkBtn('k') + '</div><div id="fb"></div>';
+        var answered = false;
+        $$('[data-k]', v).forEach(function (b) {
+          b.onclick = function () {
+            if (answered) return; answered = true;
+            var ok = +b.dataset.k >= 0 && q.opts[+b.dataset.k] === q.ans;
+            $$('[data-k]', v).forEach(function (x) { if (q.opts[+x.dataset.k] === q.ans) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+            $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', q.why) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
+            $('#nx', v).onclick = function () { if (ok) { cleared = lv; lv++; missHere = 0; } else missHere++; ask(); };
+            $('#nx', v).scrollIntoView({ block: 'nearest' });
+          };
+        });
+      }
+      function done() {
+        var P = stt(); P.course = P.course || {};
+        P.level = Math.max(1, Math.min(12, cleared + 1)); P.streak = 0; P.wrongRun = 0;
+        for (var l = 1; l <= cleared; l++) typesFor(l).forEach(function (t) { P.seen[t] = 1; });
+        var tested = 0; COURSE.forEach(function (c, i) { if (c.lv <= cleared && !P.course[i]) { P.course[i] = 1; tested++; } });
+        if (P.level >= 5) P.bot = Math.max(P.bot, 2); if (P.level >= 7) P.bot = Math.max(P.bot, 3);
+        App.save();
+        var nx = COURSE.findIndex(function (c, i) { return !P.course[i]; });
+        App.baselineSave('poker', { headline: 'Level ' + P.level + ' · ' + title(P.level) + ' · cleared ' + cleared + ' of 12', level: P.level, cleared: cleared,
+          lines: ['<b>Levels cleared:</b> ' + cleared + ' of 12 (' + (cleared ? typesFor(cleared).map(function (t) { return INTRO[t][0]; }).join(', ') + ' and everything before' : 'start from hand rankings') + ').', '<b>Drill level:</b> ' + P.level + ' · ' + title(P.level) + '.', '<b>Course lessons already known:</b> ' + tested + '.'],
+          next: nx >= 0 ? 'the lesson <b>' + COURSE[nx].t + '</b> (' + COURSE[nx].u + '). Play now builds from there.' : 'drills at your level and the table coach.' });
+        App.back(); App.baselineReport('poker');
+      }
+    });
+  }
+  if (typeof App !== 'undefined') App.reg('poker', { home: home, place: place, baseline: baseline, report: report, quick: quick });
   if (typeof applyDistract === 'function') { applyDistract(EXTRA_CONCEPTS, 1, 2); applyDistract(READS, 0, 1); }
-  return { tableMenu: tableMenu, playMulti: playMulti, cardsHTML: cardsHTML, evalHand: evalHand, cat: cat, chen: chen, equity: equity, outsInfo: outsInfo, GEN: GEN, CAT: CAT, course: course, lessonPK: lessonPK, COURSE: COURSE, drills: drills, botMenu: botMenu, play: play, BOTS: BOTS, courseOpen: courseOpen };
+  return { baseline: baseline, tableMenu: tableMenu, playMulti: playMulti, cardsHTML: cardsHTML, evalHand: evalHand, cat: cat, chen: chen, equity: equity, outsInfo: outsInfo, GEN: GEN, CAT: CAT, course: course, lessonPK: lessonPK, COURSE: COURSE, drills: drills, botMenu: botMenu, play: play, BOTS: BOTS, courseOpen: courseOpen };
 })();
 if (typeof module !== 'undefined') module.exports = PK;

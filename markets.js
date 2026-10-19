@@ -391,6 +391,53 @@ var MK = (function () {
     out.push({ label: 'Rapid fire', why: 'Speed round; the clock shrinks as your streak grows.', go: rapid, quota: 1, w: .7 });
     return out;
   }
-  App.reg('mkt', { home: home, breakQuiz: breakQuiz, place: place, report: report, quick: quick });
-  return { Q: Q, learn: function () { App.screen('Learning', function (vv) { runQuiz(vv, 0, function () {}); }); }, rapid: rapid, sim: simScreen, TOPICS: TOPICS, topicSkill: topicSkill };
+  // ---------- baseline test (Oct 18): every topic gets a basic question; right → a harder one. Topic skill, which concept cards you
+  // can skip, and your level come from the results. Saves a dated report.
+  function baseline() {
+    var ti = 0, stage = 0, score = {}, used = {}, n = 0;
+    App.screen('Markets baseline', function (v) {
+      v.innerHTML = '<div><span class="eyebrow">Baseline · about 6 minutes</span><h1>Find your markets level</h1></div><div class="prose"><ul><li>One basic question per topic (' + TOPICS.length + ' topics). Get it right and a harder one follows.</li><li>Topics you know skip their intro card; topics you miss start with it.</li><li>“I don’t know” is fine: it just means you’ll learn that topic first.</li></ul></div><button class="btn primary" id="blgo" style="width:100%">Start</button>';
+      $('#blgo', v).onclick = ask;
+      function pickFor(topic, hard) {
+        var c = Q.map(function (q, i) { return i; }).filter(function (i) { return Q[i][0] === topic && !used[i] && (hard ? Q[i][1] >= 3 : Q[i][1] <= 2); });
+        if (!c.length) c = Q.map(function (q, i) { return i; }).filter(function (i) { return Q[i][0] === topic && !used[i]; });
+        return c.length ? c[Math.floor(Math.random() * c.length)] : -1;
+      }
+      function ask() {
+        if (ti >= TOPICS.length) return done();
+        var topic = TOPICS[ti], i = pickFor(topic, stage === 1);
+        if (i < 0) { ti++; stage = 0; return ask(); }
+        used[i] = 1; n++; var q = Q[i], order = [0, 1, 2, 3].sort(function () { return Math.random() - .5; });
+        v.innerHTML = '<div class="row"><span class="pill acc">' + esc(topic) + '</span><span class="pill">' + (stage ? 'Harder' : 'Basic') + '</span><span class="grow"></span><span class="small mute">Topic ' + (ti + 1) + ' / ' + TOPICS.length + '</span></div><h2>' + esc(q[2]) + '</h2><div class="list">' + order.map(function (k) { return '<button class="btn opt" data-k="' + k + '">' + esc(q[3][k]) + '</button>'; }).join('') + App.idkBtn('k') + '</div><div id="fb"></div>';
+        var done1 = false;
+        $$('[data-k]', v).forEach(function (b) {
+          b.onclick = function () {
+            if (done1) return; done1 = true;
+            var ok = +b.dataset.k === 0;
+            $$('[data-k]', v).forEach(function (x) { if (+x.dataset.k === 0) x.classList.add('right'); else if (x === b) x.classList.add('wrong'); });
+            $('#fb', v).innerHTML = App.coachHTML(ok ? 'right' : 'wrong', esc(q[4] || '')) + '<button class="btn primary" id="nx" style="width:100%">Next</button>';
+            $('#nx', v).onclick = function () {
+              score[topic] = (score[topic] || 0) + (ok ? 1 : 0);
+              if (ok && stage === 0) stage = 1; else { ti++; stage = 0; }
+              ask();
+            };
+            $('#nx', v).scrollIntoView({ block: 'nearest' });
+          };
+        });
+      }
+      function done() {
+        var m = st(), total = 0, known = [], learn = [];
+        m.intro = m.intro || {};
+        TOPICS.forEach(function (t) { var sc = score[t] || 0; total += sc; m.topic[t] = [1, 2.5, 4][sc]; if (sc >= 1) { m.intro[t] = m.intro[t] || Date.now(); known.push(t); } else learn.push(t); });
+        m.level = Math.max(1, Math.min(7, 1 + Math.floor(total / 4))); m.xp = Math.max(xpFor(m.level - 1), Math.min(m.xp, xpFor(m.level) - 1)); m.placed = 1;
+        App.save();
+        App.baselineSave('mkt', { headline: titleOf(m.level) + ' · ' + known.length + ' of ' + TOPICS.length + ' topics known', level: m.level, known: known, total: total,
+          lines: ['<b>Topics you know:</b> ' + (known.length ? known.join(', ') : 'none yet') + '.', '<b>Topics to learn first:</b> ' + (learn.length ? learn.join(', ') : 'none: you know the basics everywhere') + '.', '<b>Level:</b> ' + m.level + ' · ' + titleOf(m.level) + ' (' + total + ' of ' + (TOPICS.length * 2) + ' points).'],
+          next: learn.length ? 'the <b>' + learn[0] + '</b> concept card, then its questions. Play now builds from there.' : 'Momentum Lab and the ToneBot course.' });
+        App.back(); App.baselineReport('mkt');
+      }
+    });
+  }
+  App.reg('mkt', { home: home, breakQuiz: breakQuiz, place: place, baseline: baseline, report: report, quick: quick });
+  return { baseline: baseline, Q: Q, learn: function () { App.screen('Learning', function (vv) { runQuiz(vv, 0, function () {}); }); }, rapid: rapid, sim: simScreen, TOPICS: TOPICS, topicSkill: topicSkill };
 })();

@@ -360,18 +360,20 @@ var XQ = (function () {
     var pool = all.filter(function (o) { return !x.psolved[o.i]; });
     if (!pool.length) { all.forEach(function (o) { delete x.psolved[o.i]; }); pool = all; }
     pool.sort(function (a, b) { return Math.abs(a.p.rating - x.prating - 60) - Math.abs(b.p.rating - x.prating - 60); });
-    var pick = pool[Math.floor(Math.random() * Math.min(4, pool.length))], p = pick.p, two = p.kind === 'mate2';
+    var pick = opt.only != null ? { p: XP[opt.only], i: opt.only } : pool[Math.floor(Math.random() * Math.min(4, pool.length))], p = pick.p, two = p.kind === 'mate2';
     var LABEL = { mate: 'Mate in 1', win: 'Win material', mate2: (p.end ? 'Endgame · ' : '') + 'Mate in 2' };
-    App.screen('Xiangqi puzzles', function (v) {
+    App.screen(opt.title || 'Xiangqi puzzles', function (v) {
       var s = { b: p.b.slice(), turn: p.turn, hist: [], ply: 0 }, done = false, first = true, stage = 0;
       v.innerHTML = '<div class="row"><span class="pill acc">' + (p.turn === 'r' ? 'Red' : 'Black') + ' to move</span><span class="pill">' + LABEL[p.kind] + ' · ~' + p.rating + '</span><span class="grow"></span><span class="mono small mute">Rating ' + x.prating + '</span></div><div id="bd"></div><div id="co"></div><div class="btns"><button class="btn" id="hn">Hint</button><button class="btn ghost" id="sol">Show solution</button></div>';
       var co = $('#co', v), start = { b: p.b, turn: p.turn, hist: [], ply: 0 };
       function solved(m, pos) {
+        if (opt.onResult) { var clean = first; done = true; if (first) { x.prating = App.elo(x.prating, p.rating, 1, 36); } x.psolved[pick.i] = 1; App.save(); co.innerHTML = App.coachMove('right', (two ? 'Checkmate. ' : '') + '<b>' + mvText(pos, m) + '</b>: ' + xIdea(pos, m) + '.'); return finishBL(clean); }
         done = true; if (first) { x.prating = App.elo(x.prating, p.rating, 1, 36); App.rate('xq', p.rating, 1, { weight: 0.2, oppRD: 150, seed: seedR, why: 'puzzle' }); } x.psolved[pick.i] = 1; App.save();
         co.innerHTML = App.coachMove('right', (two ? 'Checkmate. ' : '') + '<b>' + mvText(pos, m) + '</b>: ' + xIdea(pos, m) + '.', '<span class="mono small">→ ' + x.prating + '</span>');
         nextBtn();
       }
-      function nextBtn() { $('.btns', v).innerHTML = '<button class="btn primary" id="nx">Next puzzle</button>'; $('#nx').onclick = function () { App.checkpoint(function () { App.back(); puzzles(opt); }); }; }
+      function finishBL(ok) { done = true; $('.btns', v).innerHTML = '<button class="btn primary" id="blnx" style="width:100%">Next</button>'; $('#blnx', v).onclick = function () { App.back(); opt.onResult(ok); }; }
+      function nextBtn() { if (opt.onResult) return finishBL(true); $('.btns', v).innerHTML = '<button class="btn primary" id="nx">Next puzzle</button>'; $('#nx').onclick = function () { App.checkpoint(function () { App.back(); puzzles(opt); }); }; }
       function reply() { // the defender answers (any reply loses), then you finish it
         var rs = E.legal(s), r = rs[Math.floor(Math.random() * rs.length)], before = E.clone(s);
         setTimeout(function () { E.make(s, r); B.ui.last = r; B.render(); stage = 1; co.innerHTML = App.coachMove('right', 'Good: that forces it. They answered <b>' + mvText(before, r) + '</b>. Now finish: checkmate in one.'); }, 550);
@@ -385,10 +387,11 @@ var XQ = (function () {
           E.make(s, m); B.ui.last = m; B.ui.hint = null; B.render();
           if (two && stage === 0 && E.legal(s).length) { co.innerHTML = '<div class="thinking">They look for a defense</div>'; reply(); return; }
           solved(m, pos);
-        } else { if (first) { x.prating = App.elo(x.prating, p.rating, 0, 36); App.rate('xq', p.rating, 0, { weight: 0.2, oppRD: 150, seed: seedR, why: 'puzzle' }); App.save(); } first = false; B.render(); co.innerHTML = App.coachMove('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it. ' + (p.kind === 'win' ? 'Look for a capture or fork that wins material by force.' : two && stage === 0 ? 'Mate in 2 starts with a forcing move, usually a check, that leaves every defense losing.' : 'Look for a move after which the general has no escape and nothing can block or capture.') + ' Try again.'); }
+        } else { if (opt.onResult) { if (first) x.prating = App.elo(x.prating, p.rating, 0, 36); first = false; B.render(); co.innerHTML = App.coachMove('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it.'); return finishBL(false); } if (first) { x.prating = App.elo(x.prating, p.rating, 0, 36); App.rate('xq', p.rating, 0, { weight: 0.2, oppRD: 150, seed: seedR, why: 'puzzle' }); App.save(); } first = false; B.render(); co.innerHTML = App.coachMove('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it. ' + (p.kind === 'win' ? 'Look for a capture or fork that wins material by force.' : two && stage === 0 ? 'Mate in 2 starts with a forcing move, usually a check, that leaves every defense losing.' : 'Look for a move after which the general has no escape and nothing can block or capture.') + ' Try again.'); }
       } });
       co.innerHTML = App.coachHTML('info', p.kind === 'mate' ? 'Find the checkmate in one move.' : two ? 'Checkmate in two moves: find a forcing first move. Whatever they answer, you mate next.' : 'Find the move that wins material.');
       function hintMove() { return two && stage === 1 ? mateIn1(s)[0] : two ? (E.legal(s).filter(function (m) { return forcesMate2(s, m); })[0] || p.sol[0]) : p.sol[0]; }
+      if (opt.onResult) { $('.btns', v).innerHTML = '<button class="btn" id="bidk" style="width:100%">I don’t know</button>'; $('#bidk', v).onclick = function () { if (done) return; first = false; co.innerHTML = App.coachNote('info', 'The idea: ' + xIdea(start, p.sol[0]) + '.'); finishBL(false); }; }
       $('#hn', v).onclick = function () { if (done) return; first = false; var h = hintMove(); B.ui.hint = { f: h.f, t: h.f }; B.render(); co.innerHTML = App.coachHTML('info', 'Move the highlighted piece.'); };
       $('#sol', v).onclick = function () {
         if (done) return; first = false; done = true;
@@ -719,7 +722,53 @@ var XQ = (function () {
     // Oct 18: Move trainer is no longer in quick play ("not guessing where pieces can move"); it stays under Pick it myself
     return out;
   }
-  App.reg('xq', { home: home, place: place, report: report, quick: quick });
+  // ---------- baseline test (Oct 18): part 1 = how each of the 7 pieces moves (tap every point; pass = that rules lesson counts as done);
+  // part 2 = 6 puzzles that adapt to find your level. One try each, no hints. Saves a dated report.
+  function pieceQ(kind, title, cb) {
+    App.screen(title, function (v) {
+      var d = makeDrill(kind, 1), picked = [], over = false, B;
+      v.innerHTML = '<p class="mute small">Tap every point the highlighted <b>' + NAME[kind] + '</b> can move to, then press Check.</p><div id="bd"></div><div id="co"></div><div class="btns"><button class="btn primary" id="ck">Check</button><button class="btn" id="bidk">I don’t know</button></div>';
+      function draw() { B = mount($('#bd', v), d.s, { onTap: function (i) { if (over) return; var k = picked.indexOf(i); if (k >= 0) picked.splice(k, 1); else if (i !== d.at) picked.push(i); draw(); } }); B.ui.sel = d.at; B.ui.targets = picked.slice(); B.render(); }
+      function finish(ok) {
+        over = true; B.ui.targets = []; B.ui.marks = {}; d.ans.forEach(function (a) { B.ui.marks[a] = 'right'; }); picked.filter(function (a) { return d.ans.indexOf(a) < 0; }).forEach(function (a) { B.ui.marks[a] = 'wrong'; }); B.render();
+        $('#co', v).innerHTML = App.coachMove(ok ? 'right' : 'wrong', (ok ? 'All ' + d.ans.length + ' moves found. ' : 'Green dots are its legal moves. ') + MOVE_WHY[kind]);
+        $('.btns', v).innerHTML = '<button class="btn primary" id="blnx" style="width:100%">Next</button>'; $('#blnx', v).onclick = function () { App.back(); cb(ok); };
+      }
+      draw();
+      $('#ck', v).onclick = function () { if (over) return; finish(d.ans.every(function (a) { return picked.indexOf(a) >= 0; }) && picked.every(function (a) { return d.ans.indexOf(a) >= 0; })); };
+      $('#bidk', v).onclick = function () { if (!over) finish(false); };
+    });
+  }
+  function baseline() {
+    var x = st(), kinds = ['K', 'A', 'E', 'H', 'R', 'C', 'P'], ki = 0, known = {}, stair = null, n2 = 0, used = {};
+    App.screen('Xiangqi baseline', function (v) {
+      v.innerHTML = '<div><span class="eyebrow">Baseline · about 5 minutes</span><h1>Find your xiangqi level</h1></div><div class="prose"><ul><li><b>Part 1:</b> how each of the 7 pieces moves. Get one right and its rules lesson counts as done.</li><li><b>Part 2:</b> 6 puzzles that get harder when you’re right and easier when you miss.</li><li>One try each, no hints. “I don’t know” is fine: it places you where you’ll learn it.</li></ul></div><button class="btn primary" id="blgo" style="width:100%">Start</button>';
+      $('#blgo', v).onclick = function () { App.back(); part1(); };
+    });
+    function part1() {
+      if (ki >= kinds.length) return part2();
+      var k = kinds[ki];
+      pieceQ(k, 'Baseline 1 · the ' + NAME[k] + ' (' + (ki + 1) + '/7)', function (ok) { if (ok) { known[k] = 1; x.moveSeen = x.moveSeen || {}; x.moveSeen[k] = 1; } ki++; part1(); });
+    }
+    function part2() {
+      if (!stair) stair = App.staircase(750 + 40 * Object.keys(known).length, 200, 50, Math.min.apply(null, XP.map(function (p) { return p.rating; })), Math.max.apply(null, XP.map(function (p) { return p.rating; })));
+      if (n2 >= 6) return done();
+      var cand = XP.map(function (p, i) { return { p: p, i: i }; }).filter(function (o) { return !used[o.i]; }).sort(function (a, b) { return Math.abs(a.p.rating - stair.at) - Math.abs(b.p.rating - stair.at); });
+      var o = cand[Math.floor(Math.random() * 3)]; used[o.i] = 1; n2++;
+      puzzles({ only: o.i, title: 'Baseline 2 · puzzle ' + n2 + ' of 6', onResult: function (ok) { stair.answer(ok); part2(); } });
+    }
+    function done() {
+      var lvl = stair.result(); x.prating = lvl;
+      LESSONS.forEach(function (l) { if (l.piece && known[l.piece] && (l.piece !== 'E' || known.A)) x.lessons[l.id] = 1; });
+      App.save();
+      var nk = Object.keys(known).length, nextL = LESSONS.filter(function (l) { return !x.lessons[l.id]; })[0];
+      App.baselineSave('xq', { headline: nk + ' of 7 pieces known · puzzle level ~' + lvl, pieces: Object.keys(known), puzzle: lvl,
+        lines: ['<b>Pieces you know:</b> ' + (nk ? Object.keys(known).map(function (k) { return NAME[k]; }).join(', ') : 'none yet: the rules lessons come first') + '.', '<b>Puzzle level:</b> about ' + lvl + '.', '<b>Before bot games:</b> ' + (ready() ? 'you’re ready for regular games.' : 'finish the rules lessons, 10 puzzles and 2 guided games; the coach takes you through them.')],
+        next: nextL ? 'the lesson <b>' + esc(nextL.t) + '</b>. Play now builds from there.' : (ready() ? 'a coached game against your bot level.' : 'puzzles, then a guided game.') });
+      App.baselineReport('xq');
+    }
+  }
+  App.reg('xq', { home: home, place: place, baseline: baseline, report: report, quick: quick });
   if (typeof applyDistract === 'function') applyDistract(LESSONS.filter(function (l) { return l.q && l.q.length === 3; }).map(function (l) { return l.q; }), 0, 1);
-  return { ready: ready, book: book, bookDrill: bookDrill, wxf: wxf, BOOK: BOOK, estElo: estElo, xIdea: xIdea, analyse: analyse, makeDrill: makeDrill, home: home, lesson: lesson, LESSONS: LESSONS, playMenu: playMenu, play: play, puzzles: puzzles, charsQuiz: charsQuiz, drill: drill, BOTS: BOTS, CHARS: CHARS, mastered: mastered, hasPuzzles: function () { return XP.length > 0; } };
+  return { baseline: baseline, ready: ready, book: book, bookDrill: bookDrill, wxf: wxf, BOOK: BOOK, estElo: estElo, xIdea: xIdea, analyse: analyse, makeDrill: makeDrill, home: home, lesson: lesson, LESSONS: LESSONS, playMenu: playMenu, play: play, puzzles: puzzles, charsQuiz: charsQuiz, drill: drill, BOTS: BOTS, CHARS: CHARS, mastered: mastered, hasPuzzles: function () { return XP.length > 0; } };
 })();

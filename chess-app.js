@@ -185,7 +185,7 @@ var CZ = (function () {
     if (d[0] === 'r') return (c.peak || c.rating) >= d[1];
     if (d[0] === 'e') return !!(c.endg || {})[d[1]];
   }
-  function lessonDone(l) { return l.drills.every(drillDone); }
+  function lessonDone(l) { return !!(st().tested || {})[l.id] || l.drills.every(drillDone); } // tested out in a baseline counts as done
   function lessonOpen(i) { return i === 0 || lessonDone(LESSONS[i - 1]) || st().lessons[LESSONS[i].id]; }
 
   // ---------------- chess helpers & plain-English coach ----------------
@@ -609,13 +609,16 @@ var CZ = (function () {
     var p = opts.id ? BYID[opts.id] : pickPuzzle(opts.creative);
     var g = new Chess(p.fen), step = 0, first = true, busy = false, hints = 0, done = false;
     var youW = g.turn() === 'w';
-    App.screen(opts.id ? p.th : opts.creative ? 'Outside the box' : 'Puzzles', function (v) {
+    App.screen(opts.title || (opts.id ? p.th : opts.creative ? 'Outside the box' : 'Puzzles'), function (v) {
       var c = st();
       v.innerHTML = '<div class="row"><span class="pill acc">' + (youW ? 'White' : 'Black') + ' to move</span><span class="pill">~' + p.r + '</span><span class="grow"></span><span class="mono small mute">Your rating ' + c.rating + '</span></div>' +
         '<div id="bd"></div><div id="co"></div>' +
         '<div class="btns"><button class="btn" id="hn">Hint</button><button class="btn ghost" id="sol">Show solution</button></div>';
       var co = $('#co', v);
       var B = mount($('#bd', v), g, { flip: !youW, canMove: function () { return !busy && !done; }, onMove: onMove });
+      // baseline mode (Oct 18): one try, no hints; the result goes back to the baseline test
+      function finishBL(ok) { done = true; var bt = $('.btns', v); bt.innerHTML = '<button class="btn primary" id="blnx" style="width:100%">Next</button>'; $('#blnx', v).onclick = function () { App.back(); opts.onResult(ok); }; }
+      if (opts.onResult) { $('.btns', v).innerHTML = '<button class="btn" id="bidk" style="width:100%">I don’t know</button>'; $('#bidk', v).onclick = function () { if (done || busy) return; rate(0); co.innerHTML = App.coachNote('info', explain()); finishBL(false); }; }
       co.innerHTML = App.coachHTML('info', (opts.creative ? 'The obvious moves don’t work here. Look for a quiet move or a sacrifice. ' : 'Find the best move. ') + (p.sol.length > 1 ? 'This one takes ' + Math.ceil(p.sol.length / 2) + ' moves.' : ''));
       function rate(score) {
         if (!first) return; first = false;
@@ -647,6 +650,7 @@ var CZ = (function () {
             if (reply) why += ' They answer <b>' + esc(reply.move.san) + '</b>: ' + idea(g.fen(), reply.move.san, 'their', 'your') + '.';
             why += '<br><span class="mute small">Theme: ' + esc(p.th) + '. Try again.</span>';
             co.innerHTML = App.coachMove('wrong', why);
+            if (opts.onResult) { busy = false; co.innerHTML += App.coachNote('info', explain()); return finishBL(false); }
             setTimeout(function () { g.undo(); B.ui.marks = {}; B.ui.last = null; B.render(); busy = false; }, 900);
           });
         }
@@ -658,13 +662,14 @@ var CZ = (function () {
         return cap(out.join('. Then ')) + '.';
       }
       function solved() {
-        done = true;
+        done = true; var clean = first && hints === 0;
         var c2 = st(); var old = c2.rating;
         if (first) rate(1);
         c2.solved[p.id] = 1; App.save();
         var delta = c2.rating - old;
         var ckp = p.ck || creativeKind(p.fen, p.sol[0]);
         co.innerHTML = App.coachMove('right', explain() + (ckp ? '<br><span class="small"><b>Outside the box:</b> the key was ' + CK_TEXT[ckp] + '.</span>' : ''), '<span class="mono small">' + (delta >= 0 ? '+' : '') + delta + ' → ' + c2.rating + '</span>', hints >= 2);
+        if (opts.onResult) return finishBL(clean);
         var bt = $('.btns', v);
         bt.innerHTML = opts.id ? '<button class="btn primary" id="bk2">Back to lesson</button>' : '<button class="btn primary" id="nx">Next puzzle</button>';
         if (opts.id) $('#bk2').onclick = function () { App.checkpoint(App.back); };
@@ -1075,6 +1080,42 @@ var CZ = (function () {
     out.push({ label: 'Board vision', why: 'Name squares fast; it speeds up every calculation.', go: vision, quota: 1, w: .4 });
     return out;
   }
-  App.reg('chess', { home: home, place: place, report: report, quick: quick });
-  return { pieceSVG: pieceSVG, idea: idea, analyse: analyse, threat: threat, ALL: ALL, LESSONS: LESSONS, estElo: estElo, creativePool: creativePool, watchCues: watchCues, puzzles: puzzles, lesson: lesson, lessonDone: lessonDone, lessonOpen: lessonOpen, play: play, playMenu: playMenu, endgame: endgame, endgameMenu: endgameMenu, openings: openings, openingDrill: openingDrill, vision: vision, OPS: OPS, BOTS: BOTS, ENDG: ENDG };
+  // ---------- baseline test (Oct 18): part 1 = one puzzle per lesson unit, in order (pass = the unit's puzzles count as done);
+  // part 2 = 8 puzzles that adapt to find your level. One try each, no hints. Saves a dated report.
+  function baseline() {
+    App.screen('Chess baseline', function (v) {
+      v.innerHTML = '<div><span class="eyebrow">Baseline · about 6 minutes</span><h1>Find your chess level</h1></div><div class="prose"><ul><li><b>Part 1:</b> one puzzle from each lesson unit, in order. Solve it and that unit’s puzzles count as done, so you skip what you know.</li><li><b>Part 2:</b> 8 puzzles that get harder when you’re right and easier when you miss, to find your level.</li><li>One try each, no hints. “I don’t know” is fine: it just places you lower so you learn it.</li></ul></div><button class="btn primary" id="blgo" style="width:100%">Start</button>';
+      $('#blgo', v).onclick = run;
+    });
+    var c = st(), units = UNITS.map(function (u) { var ids = []; u.lessons.forEach(function (l) { l.drills.forEach(function (d) { if (d[0] === 'p' && BYID[d[1]]) ids.push(d[1]); }); }); return { u: u, ids: ids }; }).filter(function (x) { return x.ids.length; });
+    var ui = 0, misses = 0, passed = [], failedAt = null, used = {}, stair = null, n2 = 0;
+    function run() { App.back(); part1(); }
+    function part1() {
+      if (ui >= units.length || misses >= 2) return part2();
+      var x = units[ui], id = x.ids[Math.floor(Math.random() * x.ids.length)]; used[id] = 1;
+      puzzles({ id: id, title: 'Baseline 1 · ' + x.u.t + ' (' + (ui + 1) + '/' + units.length + ')', onResult: function (ok) {
+        if (ok) { misses = 0; passed.push(x.u.t); x.ids.forEach(function (pid) { c.solved[pid] = 1; }); x.u.lessons.forEach(function (l) { c.tested = c.tested || {}; c.tested[l.id] = 1; }); }
+        else { misses++; if (!failedAt) failedAt = x.u.t; }
+        App.save(); ui++; part1();
+      } });
+    }
+    function part2() {
+      if (!stair) stair = App.staircase(Math.min(1500, 550 + 120 * passed.length), 250, 60, Math.min.apply(null, ALL.map(function (q) { return q.r; })), 2400);
+      if (n2 >= 8) return done();
+      var p = ALL.filter(function (q) { return !used[q.id]; }).sort(function (a, b) { return Math.abs(a.r - stair.at) - Math.abs(b.r - stair.at); })[Math.floor(Math.random() * 3)];
+      used[p.id] = 1; n2++;
+      puzzles({ id: p.id, title: 'Baseline 2 · puzzle ' + n2 + ' of 8', onResult: function (ok) { stair.answer(ok); part2(); } });
+    }
+    function done() {
+      var lvl = stair.result(); c.rating = lvl; c.peak = Math.max(c.peak || 0, lvl); App.save();
+      var nextL = null; for (var i = 0; i < LESSONS.length; i++) if (!lessonDone(LESSONS[i])) { nextL = LESSONS[i]; break; }
+      var r = estElo();
+      App.baselineSave('chess', { headline: 'Puzzle level ~' + lvl + ' · ' + passed.length + ' of ' + units.length + ' units known', puzzle: lvl, units: passed, rating: r.elo,
+        lines: ['<b>Puzzle level:</b> about ' + lvl + ' (your puzzles now start there).', '<b>Units you already know:</b> ' + (passed.length ? passed.join(', ') : 'none yet: you start at the beginning') + '.', '<b>Game rating:</b> ' + r.elo + ' (likely ' + r.lo + '–' + r.hi + '). Games set this one: play rated games with the indicator off.'],
+        next: nextL ? 'the lesson <b>' + esc(nextL.t) + '</b> (' + esc(nextL.unit) + '). Play now builds from there.' : 'rated games and harder puzzles.' });
+      App.baselineReport('chess');
+    }
+  }
+  App.reg('chess', { home: home, place: place, baseline: baseline, report: report, quick: quick });
+  return { baseline: baseline, pieceSVG: pieceSVG, idea: idea, analyse: analyse, threat: threat, ALL: ALL, LESSONS: LESSONS, estElo: estElo, creativePool: creativePool, watchCues: watchCues, puzzles: puzzles, lesson: lesson, lessonDone: lessonDone, lessonOpen: lessonOpen, play: play, playMenu: playMenu, endgame: endgame, endgameMenu: endgameMenu, openings: openings, openingDrill: openingDrill, vision: vision, OPS: OPS, BOTS: BOTS, ENDG: ENDG };
 })();

@@ -336,8 +336,36 @@ var App = (function () {
     var label = { chess: 'chess', xq: 'xiangqi', poker: 'poker', mkt: 'markets' }[name];
     modal('<div class="grab"></div><span class="eyebrow">Find your level</span><h2>How much ' + label + ' do you know?</h2><p class="mute">A quick placement (about 2 minutes) gets harder when you’re right and easier when you miss, then starts you at the right level. Skip it to start from the basics.</p><div class="btns"><button class="btn" id="pskip">Start from scratch</button><button class="btn primary" id="pgo">Place me</button></div>', false);
     $('#pskip').onclick = function () { App.S[name].placed = 'skip'; save(); closeModal(); };
-    $('#pgo').onclick = function () { closeModal(); m.place(); };
+    $('#pgo').onclick = function () { closeModal(); if (m.baseline) m.baseline(); else m.place(); };
   }
+  // ---------- baseline tests (Oct 18, Alain: "a baseline test and then from there I can learn upwards … one subject at a time") ----------
+  // Each subject module registers baseline(); it tests what you already know, marks it done so you start where you are,
+  // and saves a dated report (S.baseline[k] = history, newest last) so a retake later shows how far you've come.
+  var BL_NAME = { chess: 'Chess', xq: 'Xiangqi', poker: 'Poker', mkt: 'Markets' };
+  function baselines(k) { S.baseline = S.baseline || {}; return S.baseline[k] || []; }
+  function baselineSave(k, rec) { S.baseline = S.baseline || {}; rec.d = dayKey(new Date()); (S.baseline[k] = S.baseline[k] || []).push(rec); S.baseline[k] = S.baseline[k].slice(-12); S[k].placed = 'baseline'; save(); }
+  function baselineBtn(k) {
+    if (!mods[k] || !mods[k].baseline) return '';
+    var h = baselines(k), last = h[h.length - 1];
+    return last ? '' : '<button class="item" id="bltest" style="border-color:var(--accent)"><span class="grow"><span class="t">Baseline test · find your level</span><br><span class="s">About 6 minutes. Skips what you already know, so you learn upward from there.</span></span><span class="end">›</span></button>';
+  }
+  function baselineLink(k) { var h = baselines(k), last = h[h.length - 1]; return last ? '<button class="item" id="blagain"><span class="grow"><span class="t">Baseline: ' + esc(last.headline || '') + '</span><br><span class="s">Taken ' + last.d + ' · tap to see it or retake</span></span><span class="end">›</span></button>' : ''; }
+  // the report screen: this result, the one before it, and what to do next
+  function baselineReport(k) {
+    var h = baselines(k), last = h[h.length - 1], prev = h[h.length - 2];
+    screen(BL_NAME[k] + ' baseline', function (v) {
+      if (!last) { v.innerHTML = '<p class="mute">No baseline yet.</p>'; return; }
+      v.innerHTML = '<div><span class="eyebrow">Baseline · ' + last.d + '</span><h1>' + esc(last.headline) + '</h1></div>' +
+        '<div class="panel" style="gap:6px">' + (last.lines || []).map(function (l) { return '<div class="small">' + l + '</div>'; }).join('') + '</div>' +
+        (prev ? '<div class="panel" style="gap:4px"><span class="eyebrow">Last time · ' + prev.d + '</span><div class="small">' + esc(prev.headline) + '</div></div>' : '') +
+        (last.next ? coachHTML('info', '<b>Start here:</b> ' + last.next) : '') +
+        '<div class="btns"><button class="btn primary" id="blgo">Start learning</button><button class="btn" id="blre">Retake baseline</button></div>';
+      $('#blgo', v).onclick = function () { stack = []; playNow(k); };
+      $('#blre', v).onclick = function () { mods[k].baseline(); };
+    });
+  }
+  // small adaptive helper: a staircase that homes in on a level (start, step shrinks each answer)
+  function staircase(start, step, min, lo, hi) { var st0 = { at: start, step: step, hist: [] }; st0.answer = function (ok) { st0.hist.push(st0.at); st0.at = Math.max(lo || 0, Math.min(hi || 99999, st0.at + (ok ? 1 : -1) * st0.step)); st0.step = Math.max(min || 50, Math.round(st0.step * 0.7)); }; st0.result = function () { var t = st0.hist.slice(-4).concat([st0.at]); return Math.round(t.reduce(function (a, b) { return a + b; }, 0) / t.length); }; return st0; }
   // screen(title, renderFn): renderFn(viewEl) draws; pushes onto back stack
   function screen(title, fn, opts) {
     opts = opts || {};
@@ -564,16 +592,16 @@ var App = (function () {
   function playNowEnd() { QP.active = false; QP.only = null; FADE.run = 0; S.qpOn = 0; S.qpOnly = null; save(); closeModal(); toast('Play now stopped'); }
   function playNowBtn(k) {
     var on = QP.active && QP.only === k;
-    return '<button class="btn primary hqp" id="playnow">' + (on ? 'Keep playing' : 'Play now') + '<span>' + (on ? qname(k) + ' only · keeps going until you stop' : 'Picks your next step and keeps going until you stop') + '</span></button>';
+    return baselineBtn(k) + '<button class="btn primary hqp" id="playnow">' + (on ? 'Keep playing' : 'Play now') + '<span>' + (on ? qname(k) + ' only · keeps going until you stop' : 'Picks your next step and keeps going until you stop') + '</span></button>';
   }
-  function wirePlayNow(v, k) { var b = $('#playnow', v); if (b) b.onclick = function () { if (QP.active && QP.only === k) qpNext(); else playNow(k); }; foldRest(v, k); }
+  function wirePlayNow(v, k) { var b = $('#playnow', v); if (b) b.onclick = function () { if (QP.active && QP.only === k) qpNext(); else playNow(k); }; var bt = v.querySelector('#bltest'); if (bt) bt.onclick = function () { mods[k].baseline(); }; foldRest(v, k); var ba = v.querySelector('#blagain'); if (ba) ba.onclick = function () { baselineReport(k); }; }
   // Oct 18: each section shows header, Play now and the coach; everything else folds under "Pick it myself" (open state remembered per section)
   function foldRest(v, k) {
     var c = $('#playnow', v); if (!c || c.parentNode !== v) return;
     var coach = c.nextElementSibling; while (coach && !coach.classList.contains('coach')) coach = coach.nextElementSibling;
     var from = (coach || c).nextElementSibling; if (!from) return;
     var d = document.createElement('details'); d.className = 'panel more pickself'; S.pickOpen = S.pickOpen || {}; if (S.pickOpen[k]) d.open = true;
-    d.innerHTML = '<summary class="eyebrow" style="cursor:pointer">Pick it myself</summary>';
+    d.innerHTML = '<summary class="eyebrow" style="cursor:pointer">Pick it myself</summary>' + baselineLink(k);
     v.insertBefore(d, from);
     while (d.nextSibling) d.appendChild(d.nextSibling);
     d.addEventListener('toggle', function () { S.pickOpen[k] = d.open ? 1 : 0; save(); });
@@ -1039,7 +1067,7 @@ var App = (function () {
   }
 
   return {
-    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, coachMove: coachMove, coachNote: coachNote, rating: rating, rate: rate, ratingInfo: ratingInfo, setRating: setRating, freshPick: freshPick, recentHas: recentHas, recentAdd: recentAdd, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
+    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, baselineSave: baselineSave, baselineReport: baselineReport, baselines: baselines, staircase: staircase, coachMove: coachMove, coachNote: coachNote, rating: rating, rate: rate, ratingInfo: ratingInfo, setRating: setRating, freshPick: freshPick, recentHas: recentHas, recentAdd: recentAdd, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
     st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, playNow: playNow, playNowBtn: playNowBtn, wirePlayNow: wirePlayNow, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, addDays: addDays, dayKey: dayKey, streak: function () { return streak(); }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
