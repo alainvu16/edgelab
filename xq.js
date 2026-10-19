@@ -169,6 +169,7 @@ var XQ = (function () {
       if (ui.sel === i) cls += ' sel';
       if (ui.last && (ui.last.f === i || ui.last.t === i)) cls += ' last';
       if (ui.hint && (ui.hint.f === i || ui.hint.t === i)) cls += ' hint';
+      if (ui.hint && ui.hint.t === i && ui.hint.t !== ui.hint.f) cls += ' hintTo'; // Oct 18: clear marker on the destination
       if (chk === i) cls += ' chk';
       var inner = '';
       if (p) inner += '<span class="xpc ' + p[0] + '">' + HAN[p[0]][p[1]] + (ui.labels && !mastered(p) ? '<span class="en"><span>' + LETTER[p[1]] + '</span></span>' : '') + '</span>';
@@ -421,16 +422,19 @@ var XQ = (function () {
     App.screen(bot.name + ' bot' + (guided ? ' · guided' : casual ? ' · just play' : ''), function (v) {
       var s = E.start(), busy = false, over = false, log = [], reps = {};
       v.innerHTML = '<div class="row"><span class="pill acc">You: Red</span><span class="pill">Bot Lv ' + lv + '</span><span class="grow"></span><span class="mono small mute" id="pc"></span></div><div id="bd"></div><div id="watch"></div><div id="co"></div><div id="op" class="small mute"></div>' +
-        '<div class="btns" id="bt"><button class="btn" id="hn">Hint</button><button class="btn" id="tb">Take back</button><button class="btn ghost" id="rs">Resign</button></div>';
+        '<div class="btns" id="bt"><button class="btn" id="hn">Hint</button><button class="btn" id="tb">Take back</button><button class="btn ghost" id="rs">Resign</button></div>' + (casual || guided ? '' : '<button class="btn sm ghost" id="ind" style="width:100%"></button>');
       var co = $('#co', v), opEl = $('#op', v);
       var B = mount($('#bd', v), s, { canMove: function () { return !busy && !over && s.turn === 'r'; }, onMove: onMove });
-      co.innerHTML = casual ? '' : App.coachHTML('info', guided ? '<b>Guided game.</b> Every turn the coach highlights a good move and says why. Follow it, or try your own: either way you get graded, and this game doesn’t count toward your record.' : 'Your move. A classic start: cannon to the center file (b3 or h3 to e3).');
+      co.innerHTML = casual ? '' : App.coachHTML('info', guided ? '<b>Guided game.</b> Every turn the coach marks a good move (ringed piece, green dot where it goes) and says why. Follow it, or try your own: either way you get graded, and this game doesn’t count toward your record.' : 'Your move. A classic start: cannon to the center file (b3 or h3 to e3).');
+      var xs = st(); if (xs.ind === undefined) xs.ind = true;
+      function indLabel() { var b = v.querySelector('#ind'); if (b) b.textContent = 'Best-move indicator: ' + (xs.ind ? 'On' : 'Off'); }
+      if (!casual && !guided) { indLabel(); v.querySelector('#ind').onclick = function () { xs.ind = !xs.ind; App.save(); indLabel(); if (xs.ind) suggest(); else { B.ui.hint = null; B.render(); var sg = v.querySelector('#sg'); if (sg) sg.innerHTML = ''; } }; }
       showWatch(); suggest();
-      function suggest() { // guided: highlight a good move with the reason
-        if (!guided || over || s.turn !== 'r') return;
+      function suggest() { // guided games, or the best-move indicator in coached games: highlight a good move with the reason
+        if (!(guided || (!casual && xs.ind)) || over || s.turn !== 'r') return;
         App.engine({ game: 'xq', op: 'best', b: s.b, turn: s.turn, ply: s.ply, depth: 3, ms: 700 }).then(function (r) {
-          if (over || s.turn !== 'r' || !r || !r.move) return; B.ui.hint = r.move; B.render(); try {
-          var note = '<b>Suggested: ' + mvText(s, r.move) + '</b> (highlighted): ' + xIdea(s, r.move, 'your', 'their') + '.';
+          if (over || s.turn !== 'r' || !r || !r.move || !(guided || xs.ind)) return; B.ui.hint = r.move; B.render(); try {
+          var note = '<b>Suggested: ' + mvText(s, r.move) + '</b> (ringed piece → green dot): ' + xIdea(s, r.move, 'your', 'their') + '.';
           var sg = v.querySelector('#sg'); if (!sg) { sg = document.createElement('div'); sg.id = 'sg'; $('#watch', v).before(sg); } sg.innerHTML = App.coachHTML('info', note); } catch (e) {} // note: App.$ returns a blank div when nothing matches
         });
       }
@@ -523,7 +527,7 @@ var XQ = (function () {
       };
       $('#tb', v).onclick = function () {
         if (busy || over || s.hist.length < 2) return;
-        E.undo(s); E.undo(s); log.pop(); B.ui.last = null; B.ui.hint = null; B.render(); co.innerHTML = App.coachHTML('info', 'Taken back. Your move.'); opEl.textContent = '';
+        E.undo(s); E.undo(s); log.pop(); B.ui.last = null; B.ui.hint = null; B.render(); co.innerHTML = App.coachHTML('info', 'Taken back. Your move.'); opEl.textContent = ''; suggest();
       };
       $('#rs', v).onclick = function () { if (!over) finish('l'); };
     });

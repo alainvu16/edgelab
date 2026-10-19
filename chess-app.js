@@ -331,6 +331,7 @@ var CZ = (function () {
       if (ui.last && (ui.last.from === sq || ui.last.to === sq)) cls += ' last';
       if (ui.sel === sq) cls += ' sel';
       if (ui.hint && (ui.hint.from === sq || ui.hint.to === sq)) cls += ' hint';
+      if (ui.hint && ui.hint.to === sq && ui.hint.to !== ui.hint.from) cls += ' hintTo'; // Oct 18: clear marker on the destination
       if (chk === sq) cls += ' chk';
       if (ui.marks && ui.marks[sq]) cls += ' ' + ui.marks[sq];
       var inner = '';
@@ -858,9 +859,22 @@ var CZ = (function () {
       var g = new Chess(), busy = false, over = false, log = [];
       v.innerHTML = '<div class="row"><span class="pill acc">You: ' + (my === 'w' ? 'White' : 'Black') + '</span><span class="pill">Bot Lv ' + lv + ' ' + bot.elo + '</span></div>' +
         '<div id="bd"></div><div id="watch"></div><div id="co"></div><div id="op" class="small mute"></div><div class="moves" id="mv"></div>' +
-        '<div class="btns" id="bt"><button class="btn" id="hn">Hint</button><button class="btn" id="tb">Take back</button><button class="btn ghost" id="rs">Resign</button></div>';
-      var co = $('#co', v), opEl = $('#op', v);
+        '<div class="btns" id="bt"><button class="btn" id="hn">Hint</button><button class="btn" id="tb">Take back</button><button class="btn ghost" id="rs">Resign</button></div>' + (casual ? '' : '<button class="btn sm ghost" id="ind" style="width:100%"></button>');
+      var co = $('#co', v), opEl = $('#op', v), cst = st(); if (cst.ind === undefined) cst.ind = true;
       var B = mount($('#bd', v), g, { flip: my === 'b', canMove: function () { return !busy && !over && g.turn() === my; }, onMove: onMove });
+      // Oct 18 (Alain: "indicators to show proper moves"): when on, your best move is marked every turn (piece ring + green dot) with the reason
+      function indLabel() { var b = v.querySelector('#ind'); if (b) b.textContent = 'Best-move indicator: ' + (cst.ind ? 'On' : 'Off'); }
+      function indicate() {
+        if (casual || over || !cst.ind || g.turn() !== my) return;
+        var fen = g.fen();
+        App.engine({ game: 'chess', op: 'best', fen: fen, depth: 3, ms: 700 }).then(function (r) {
+          if (over || !cst.ind || g.fen() !== fen || !r || !r.move) return;
+          B.ui.hint = { from: r.move.from, to: r.move.to }; B.render();
+          var sg = v.querySelector('#sg'); if (!sg) { sg = document.createElement('div'); sg.id = 'sg'; $('#watch', v).before(sg); }
+          sg.innerHTML = App.coachHTML('info', '<b>Best move: ' + esc(r.move.san) + '</b> (ringed piece → green dot): ' + idea(fen, r.move.san) + '.');
+        });
+      }
+      if (!casual) { indLabel(); v.querySelector('#ind').onclick = function () { cst.ind = !cst.ind; App.save(); indLabel(); if (cst.ind) indicate(); else { B.ui.hint = null; B.render(); var sg = v.querySelector('#sg'); if (sg) sg.innerHTML = ''; } }; }
       co.innerHTML = casual ? '' : App.coachHTML('info', 'Your move. Use the checklist: their threats, your checks and captures, then safety.');
       function moveList() {
         var h = g.history(), html = '', qi = 0;
@@ -874,7 +888,7 @@ var CZ = (function () {
       }
       function onMove(mv) {
         var before = g.fen(); var r = g.move(mv); if (!r) return;
-        B.ui.last = { from: r.from, to: r.to }; B.ui.hint = null; B.render(); busy = true; $('#watch', v).innerHTML = '';
+        B.ui.last = { from: r.from, to: r.to }; B.ui.hint = null; B.render(); busy = true; $('#watch', v).innerHTML = ''; if (v.querySelector('#sg')) v.querySelector('#sg').innerHTML = '';
         co.innerHTML = casual ? '' : '<div class="thinking">Coach is checking your move</div>'; opEl.textContent = '';
         analyse(before, r.san).then(function (a) {
           log.push(a);
@@ -900,7 +914,7 @@ var CZ = (function () {
           B.ui.last = { from: r.from, to: r.to }; B.render();
           var t = threat(g.fen());
           opEl.innerHTML = casual ? 'Bot played <b>' + esc(r.san) + '</b>.' : 'Bot played <b>' + esc(r.san) + '</b>: ' + idea(before, r.san, 'their', 'your') + '.' + (t && t.gain >= 300 ? ' <b>Careful: it now threatens your ' + N[t.t] + '.</b> Check it.' : '');
-          busy = false; if (!casual) { moveList(); showWatch(); }
+          busy = false; if (!casual) { moveList(); showWatch(); indicate(); }
           if (g.game_over()) end();
         });
       }
@@ -960,10 +974,10 @@ var CZ = (function () {
         if (busy || over) return;
         if (g.turn() === my && g.history().length >= 2) { g.undo(); g.undo(); log.pop(); }
         else if (g.turn() !== my && g.history().length) { g.undo(); log.pop(); }
-        B.ui.last = null; B.ui.hint = null; B.render(); moveList(); co.innerHTML = App.coachHTML('info', 'Taken back. Your move.'); opEl.textContent = '';
+        B.ui.last = null; B.ui.hint = null; B.render(); moveList(); co.innerHTML = App.coachHTML('info', 'Taken back. Your move.'); opEl.textContent = ''; indicate();
       };
       $('#rs', v).onclick = function () { if (!over) { co.innerHTML = ''; finish('l'); } };
-      if (my === 'b') { busy = true; botMove(); } else showWatch();
+      if (my === 'b') { busy = true; botMove(); } else { showWatch(); indicate(); }
     });
   }
 

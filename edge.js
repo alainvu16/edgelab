@@ -50,10 +50,10 @@ var EG = (function () {
   function all() { return SUBJ.map(function (s) { return info(s[0]); }).filter(Boolean); }
   function overall() { var a = all(); if (!a.length) return null; return Math.round(a.reduce(function (t, x) { return t + x.now; }, 0) / a.length); }
   function lastActive() { var t = 0, s = st().s; Object.keys(s).forEach(function (k) { t = Math.max(t, s[k].t || 0); }); return t; }
-  function daysAway() { var t = lastActive(); return t ? (Date.now() - t) / 864e5 : 0; }
+  function daysAway() { var t = lastActive(); if (!t) return 0; var a = new Date(t), b = new Date(); return Math.round((new Date(b.getFullYear(), b.getMonth(), b.getDate()) - new Date(a.getFullYear(), a.getMonth(), a.getDate())) / 864e5); } // calendar days since you last trained (Mon→Fri = 4)
   // subjects most in need of a re-test first: faded the most from their peak, then lowest now
   function rank() { return all().sort(function (a, b) { return (b.peak - b.now) - (a.peak - a.now) || a.now - b.now; }).map(function (x) { return x.k; }); }
-  function daysTrained(n) { var e = st(), c = 0; for (var i = 0; i < n; i++) if (e.days[dk(Date.now() - i * 864e5)]) c++; return c; }
+  function daysTrained(n) { var e = st(), c = 0, t = new Date(); for (var i = 0; i < n; i++) if (e.days[dk(new Date(t.getFullYear(), t.getMonth(), t.getDate() - i, 12).getTime())]) c++; return c; } // calendar days, DST-safe
   function ago(d) { return d < 1 ? 'today' : d < 2 ? 'yesterday' : Math.floor(d) + ' days ago'; }
   function color(v) { return v >= 75 ? 'var(--good)' : v >= 55 ? 'var(--accent)' : 'var(--bad)'; }
 
@@ -70,7 +70,7 @@ var EG = (function () {
     if (away < AWAY || tot < 30 || e.welcomed === t) return false;
     e.welcomed = t; App.save();
     var a = all(), was = a.length ? Math.round(a.reduce(function (s, x) { return s + x.peak; }, 0) / a.length) : 0, now = overall();
-    var sheet = App.modal('<div class="grab"></div><span class="eyebrow">Welcome back</span><h2>' + Math.floor(away) + ' days away</h2><p>Your edge went from <b>' + was + '</b> to <b>' + now + '</b> while you were gone. That’s normal; it comes back fastest with a short re-test, not a marathon.</p><p class="small mute">Edge check: quick play starts with the subjects that faded most, about 10 minutes, then carries on as usual.</p><div class="btns"><button class="btn" id="egl">Later</button><button class="btn primary" id="egs">Start edge check</button></div>', false);
+    var sheet = App.modal('<div class="grab"></div><span class="eyebrow">Welcome back</span><h2>' + away + ' day' + (away === 1 ? '' : 's') + ' away</h2><p>Your edge went from <b>' + was + '</b> to <b>' + now + '</b> while you were gone. That’s normal; it comes back fastest with a short re-test, not a marathon.</p><p class="small mute">Edge check: quick play starts with the subjects that faded most, about 10 minutes, then carries on as usual.</p><div class="btns"><button class="btn" id="egl">Later</button><button class="btn primary" id="egs">Start edge check</button></div>', false);
     $('#egl', sheet).onclick = function () { App.closeModal(); };
     $('#egs', sheet).onclick = function () { App.closeModal(); start(); };
     return true;

@@ -273,6 +273,25 @@ var GL = (function () {
   var AREA_OF_TAB = { poker: 'Poker', mkt: 'Trading', chess: 'Chess', xq: 'Xiangqi' };
   var SKIP = 'button,.opt,a,input,textarea,select,.gl,.pill,.crumb,.eyebrow,svg,canvas,.board,.xboard,.table,.mono,code,.hchip,.qod,.game,.dial,#tabs,#top';
   var done = typeof WeakSet !== 'undefined' ? new WeakSet() : null;
+  // Oct 18 (Alain: "poker sometimes feels like guessing because I don't understand terminology"): the jargon in a question
+  // and its answer choices, listed with plain meanings right under the question (answer buttons can't be underlined)
+  function termsIn(text, area) {
+    var out = [], m, plain = String(text || '').replace(/<[^>]+>/g, ' '); RE.lastIndex = 0;
+    while ((m = RE.exec(plain))) {
+      var word = m[2], key = word.toLowerCase(), i = byKey[key]; if (i == null) continue;
+      if (CAPS[key] && word !== CAPS[key]) continue;
+      if (COMMON[key] && (!area || T[i][2].indexOf(area) < 0)) continue;
+      if (area && T[i][2].indexOf(area) < 0) continue;
+      if (out.indexOf(i) < 0) out.push(i);
+    }
+    return out;
+  }
+  function keyWords(texts, area, max) {
+    var g = gst(), idx = termsIn([].concat(texts).join(' · '), area).filter(function (i) { return (g.box[i] || 0) < 3; }).slice(0, max || 4);
+    if (!idx.length) return '';
+    idx.forEach(function (i) { if (g.box[i] === undefined) { g.box[i] = 0; g.seen[i] = Date.now(); } }); // counts as shown, so Words to Know can quiz it later
+    return '<div class="panel kw" style="gap:4px;padding:10px 12px"><span class="eyebrow">Words in this question</span>' + idx.map(function (i) { return '<div class="small"><b>' + App.esc(T[i][0]) + '</b>: ' + App.esc(short(T[i][3])) + '</div>'; }).join('') + '</div>';
+  }
   function currentArea() { var t = document.querySelector('#tabs [aria-current="true"]'); return t ? AREA_OF_TAB[t.dataset.tab] || '' : ''; }
   function wrap(root) {
     if (!root || !root.querySelectorAll) return;
@@ -459,5 +478,5 @@ var GL = (function () {
   var obs = new MutationObserver(function () { if (pend) return; pend = setTimeout(function () { pend = null; try { wrap(document.getElementById('view')); wrap(document.getElementById('modal')); } catch (e) {} }, 40); });
   function start() { var m = document.getElementById('main'), md = document.getElementById('modal'); if (m) obs.observe(m, { childList: true, subtree: true, characterData: false }); if (md) obs.observe(md, { childList: true, subtree: true }); wrap(document.getElementById('view')); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else setTimeout(start, 0);
-  return { known: function (i) { return (gst().box[i] || 0) >= 3; }, left: left, plan: plan, grade: grade, isNew: isNew, nextReviewDays: nextReviewDays, report: report, T: T, screen: screen, wrap: wrap, show: show, drill: drill, dueCount: dueCount, mastered: mastered };
+  return { termsIn: termsIn, keyWords: keyWords, known: function (i) { return (gst().box[i] || 0) >= 3; }, left: left, plan: plan, grade: grade, isNew: isNew, nextReviewDays: nextReviewDays, report: report, T: T, screen: screen, wrap: wrap, show: show, drill: drill, dueCount: dueCount, mastered: mastered };
 })();

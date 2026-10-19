@@ -390,9 +390,9 @@ var App = (function () {
     if (vis && S.session.active) {
       S.session.used += dt; S.session.sinceBreak += dt; save();
     }
+    if (vis && (curTab !== 'home' || stack.length > 1) && now - lastTouch < 120000) logDay(); // Oct 18: daily games opened from Home count as a training day too
     if (vis && curTab !== 'home' && now - lastTouch < 120000) {
       S.hours = S.hours || {}; S.hours[curTab] = (S.hours[curTab] || 0) + dt;
-      var dk = dayKey(new Date()); S.dayLog = S.dayLog || {}; if (!S.dayLog[dk]) { S.dayLog[dk] = 1; var dks = Object.keys(S.dayLog).sort(); if (dks.length > 400) delete S.dayLog[dks[0]]; }
       if (Math.floor((S.hours[curTab] - dt) / 60000) !== Math.floor(S.hours[curTab] / 60000)) save();
     }
     tickUI();
@@ -406,13 +406,17 @@ var App = (function () {
     t.className = 'timer' + (left < 5 * 60000 ? ' low' : '');
   }
   // local calendar day (the old UTC key flipped at 8 PM Eastern)
+  // Oct 18 ("count the days more accurately"): days are calendar days in your time zone. Moving a day back uses the calendar
+  // (setDate at noon), not minus 24 hours, so daylight-saving changes can't skip or double a day. Any answer or training screen logs the day.
+  function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, 12); }
+  function logDay() { var dk = dayKey(new Date()); S.dayLog = S.dayLog || {}; if (!S.dayLog[dk]) { S.dayLog[dk] = 1; var dks = Object.keys(S.dayLog).sort(); if (dks.length > 400) delete S.dayLog[dks[0]]; save(); } }
   function dayKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   // streak = consecutive days with any training, counted from today (or yesterday if you haven't trained yet today)
   function streak() {
-    var log = S.dayLog || {}, d = new Date(), n = 0;
-    var has = function (x) { var k = dayKey(x), u = x.toISOString().slice(0, 10); return log[k] || log[u]; };
-    if (!has(d)) d = new Date(d.getTime() - 864e5);
-    while (has(d) && n < 999) { n++; d = new Date(d.getTime() - 864e5); }
+    var log = S.dayLog || {}, d = addDays(new Date(), 0), n = 0;
+    var has = function (x) { return !!log[dayKey(x)]; };
+    if (!has(d)) d = addDays(d, -1);
+    while (has(d) && n < 999) { n++; d = addDays(d, -1); }
     return n;
   }
   // a time box belongs to the day it was started: a new day starts fresh
@@ -421,7 +425,7 @@ var App = (function () {
     S.session = { limit: min, active: true, used: 0, sinceBreak: 0, extended: false, day: dayKey(new Date()) };
     var today = new Date().toDateString();
     if (S.lastDay !== today) {
-      var y = new Date(Date.now() - 864e5).toDateString();
+      var y = addDays(new Date(), -1).toDateString();
       S.streakDays = S.lastDay === y ? S.streakDays + 1 : 1; S.lastDay = today;
     }
     save(); tickUI();
@@ -719,7 +723,7 @@ var App = (function () {
   function tally() {
     if (!S || Date.now() - tallyAt < 400) return false; tallyAt = Date.now();
     var dk = dayKey(new Date()); if (!S.daily || S.daily.d !== dk) S.daily = { d: dk, n: 0 };
-    S.daily.n++; if (typeof WZ !== 'undefined' && WZ.sageTick) WZ.sageTick(); save(); return true;
+    S.daily.n++; logDay(); if (typeof WZ !== 'undefined' && WZ.sageTick) WZ.sageTick(); save(); return true;
   }
   // Quick play runs until you stop it, so the app watches for fading focus: 3 real misses in a row
   // ("I don't know" doesn't count; new material is allowed to be hard). After one offer, quiet for 10 answers.
@@ -1008,6 +1012,6 @@ var App = (function () {
     backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, freshPick: freshPick, recentHas: recentHas, recentAdd: recentAdd, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
-    st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, playNow: playNow, playNowBtn: playNowBtn, wirePlayNow: wirePlayNow, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
+    st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, playNow: playNow, playNowBtn: playNowBtn, wirePlayNow: wirePlayNow, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, addDays: addDays, dayKey: dayKey, streak: function () { return streak(); }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }
   };
 })();

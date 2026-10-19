@@ -185,6 +185,8 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 .sq.last::after{content:"";position:absolute;inset:0;background:var(--sq-last)}
 .sq.sel::after{content:"";position:absolute;inset:0;background:rgba(242,207,91,.65)}
 .sq.hint::after{content:"";position:absolute;inset:0;box-shadow:inset 0 0 0 4px #2f8fdc}
+.sq.hintTo::before{content:"";position:absolute;z-index:4;left:32%;top:32%;width:36%;height:36%;border-radius:50%;background:#27a35a;box-shadow:0 0 0 3px rgba(255,255,255,.85);pointer-events:none}
+.xpt.hintTo::after{content:"";position:absolute;z-index:4;width:46%;height:46%;border-radius:50%;background:#27a35a;box-shadow:0 0 0 3px rgba(255,255,255,.9);pointer-events:none}
 .sq.chk::after{content:"";position:absolute;inset:0;background:radial-gradient(circle,rgba(236,60,50,.85) 0,rgba(236,60,50,0) 70%)}
 .sq.wrong::after{content:"";position:absolute;inset:0;background:rgba(236,90,80,.55)}
 .sq.right::after{content:"";position:absolute;inset:0;background:rgba(70,190,130,.55)}
@@ -267,40 +269,40 @@ a.btn{text-decoration:none;display:inline-flex;align-items:center;justify-conten
 </div>
 <div id="modal"></div>
 
-<link rel="stylesheet" href="future.css?v=71">
-<script src="chess.js?v=71"></script>
-<script src="core.js?v=71"></script>
-<script src="respell.js?v=71"></script>
-<script src="glossmore.js?v=71"></script>
-<script src="glossary.js?v=71"></script>
-<script src="content.js?v=71"></script>
-<script src="distract.js?v=71"></script>
-<script src="engine.js?v=71"></script>
-<script src="puzzles.js?v=71"></script>
-<script src="chessrep.js?v=71"></script>
-<script src="chess-app.js?v=71"></script>
-<script src="xq-engine.js?v=71"></script>
-<script src="xqbook.js?v=71"></script>
-<script src="xqmore.js?v=71"></script>
-<script src="xq.js?v=71"></script>
-<script src="poker.js?v=71"></script>
-<script src="mktdata.js?v=71"></script>
-<script src="tapedata.js?v=71"></script>
-<script src="momentum.js?v=71"></script>
-<script src="sages.js?v=71"></script>
-<script src="wisdom.js?v=71"></script>
-<script src="think.js?v=71"></script>
-<script src="math.js?v=71"></script>
-<script src="streetdata.js?v=71"></script>
-<script src="street.js?v=71"></script>
-<script src="edge.js?v=71"></script>
-<script src="macro.js?v=71"></script>
-<script src="tape.js?v=71"></script>
-<script src="tonebot.js?v=71"></script>
-<script src="mktcards.js?v=71"></script>
-<script src="markets.js?v=71"></script>
-<script src="roadmap.js?v=71"></script>
-<script src="popmix.js?v=71"></script>
+<link rel="stylesheet" href="future.css?v=72">
+<script src="chess.js?v=72"></script>
+<script src="core.js?v=72"></script>
+<script src="respell.js?v=72"></script>
+<script src="glossmore.js?v=72"></script>
+<script src="glossary.js?v=72"></script>
+<script src="content.js?v=72"></script>
+<script src="distract.js?v=72"></script>
+<script src="engine.js?v=72"></script>
+<script src="puzzles.js?v=72"></script>
+<script src="chessrep.js?v=72"></script>
+<script src="chess-app.js?v=72"></script>
+<script src="xq-engine.js?v=72"></script>
+<script src="xqbook.js?v=72"></script>
+<script src="xqmore.js?v=72"></script>
+<script src="xq.js?v=72"></script>
+<script src="poker.js?v=72"></script>
+<script src="mktdata.js?v=72"></script>
+<script src="tapedata.js?v=72"></script>
+<script src="momentum.js?v=72"></script>
+<script src="sages.js?v=72"></script>
+<script src="wisdom.js?v=72"></script>
+<script src="think.js?v=72"></script>
+<script src="math.js?v=72"></script>
+<script src="streetdata.js?v=72"></script>
+<script src="street.js?v=72"></script>
+<script src="edge.js?v=72"></script>
+<script src="macro.js?v=72"></script>
+<script src="tape.js?v=72"></script>
+<script src="tonebot.js?v=72"></script>
+<script src="mktcards.js?v=72"></script>
+<script src="markets.js?v=72"></script>
+<script src="roadmap.js?v=72"></script>
+<script src="popmix.js?v=72"></script>
 <script>
 window.addEventListener('error', function (e) {
   try { (window.__errs = window.__errs || []).push(new Date().toISOString().slice(0, 16) + ' ' + (e.message || e) + (e.filename ? ' @' + e.filename.split('/').pop().split('?')[0] + ':' + e.lineno : '')); if (window.__errs.length > 30) window.__errs.shift(); } catch (x) {}

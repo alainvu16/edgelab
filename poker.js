@@ -517,6 +517,8 @@ var PK = (function () {
     return '<div class="list">' + names.map(function (n, i) { return '<div class="row"><span class="small" style="width:110px">' + CAT[n] + '</span>' + demo[i].map(function (c) { return cardHTML(c); }).join('') + '</div>'; }).join('') + '</div>';
   }
 
+  // Oct 18: plain meanings for the jargon in each question (Words to Know terms), shown right under it
+  function KW(texts, max) { return typeof GL !== 'undefined' && GL.keyWords ? GL.keyWords(texts, 'Poker', max) : ''; }
   function drills() {
     App.screen('Poker drills', function (v) {
       var p = stt(), q, answered, tmr = null, left = 0, count = 0;
@@ -541,7 +543,7 @@ var PK = (function () {
         else $('#tm', v).textContent = '';
       }
       function intro(type) {
-        $('#qa', v).innerHTML = '<div class="panel"><span class="eyebrow">New skill unlocked</span><h2>' + INTRO[type][0] + '</h2><p>' + INTRO[type][1] + '</p>' + (type === 'name' ? rankingsTable() : '') + '<button class="btn primary" id="go">Start</button></div>';
+        $('#qa', v).innerHTML = '<div class="panel"><span class="eyebrow">New skill unlocked</span><h2>' + INTRO[type][0] + '</h2><p>' + INTRO[type][1] + '</p>' + KW([INTRO[type][0], INTRO[type][1]], 6) + (type === 'name' ? rankingsTable() : '') + '<button class="btn primary" id="go">Start</button></div>';
         $('#go', v).onclick = next;
       }
       function draw() {
@@ -551,7 +553,7 @@ var PK = (function () {
         if (q.hero) html += '<div class="seat">' + cardsHTML(q.hero, { big: true }) + '<span class="nm">You</span></div>';
         html += '</div>';
         if (!q.hero && !(q.board && q.board.length)) html = '';
-        $('#qa', v).innerHTML = html + '<h3>' + q.q + '</h3><div class="list">' + q.opts.map(function (o, i) { return '<button class="btn opt" data-i="' + i + '">' + o + '</button>'; }).join('') + App.idkBtn('i') + '</div><div id="fb"></div>';
+        $('#qa', v).innerHTML = html + '<h3>' + q.q + '</h3>' + KW([q.q].concat(q.opts)) + '<div class="list">' + q.opts.map(function (o, i) { return '<button class="btn opt" data-i="' + i + '">' + o + '</button>'; }).join('') + App.idkBtn('i') + '</div><div id="fb"></div>';
         $$('[data-i]', v).forEach(function (b) { b.onclick = function () { answer(q.opts[+b.dataset.i], b); }; });
       }
       function answer(o, btn) {
@@ -631,7 +633,7 @@ var PK = (function () {
       function ask() {
         if (n >= N) return finish();
         var q = GEN[c.types[n % c.types.length]]();
-        $('#qa', v).innerHTML = '<div class="row"><span class="pill acc">' + (n + 1) + ' / ' + N + '</span><span class="pill">' + right + ' right</span></div>' + qTable(q) + '<h3>' + q.q + '</h3><div class="list">' + q.opts.map(function (o, k) { return '<button class="btn opt" data-i="' + k + '">' + o + '</button>'; }).join('') + App.idkBtn('i') + '</div><div id="fb"></div>';
+        $('#qa', v).innerHTML = '<div class="row"><span class="pill acc">' + (n + 1) + ' / ' + N + '</span><span class="pill">' + right + ' right</span></div>' + qTable(q) + '<h3>' + q.q + '</h3>' + KW([q.q].concat(q.opts)) + '<div class="list">' + q.opts.map(function (o, k) { return '<button class="btn opt" data-i="' + k + '">' + o + '</button>'; }).join('') + App.idkBtn('i') + '</div><div id="fb"></div>';
         var done = false;
         $$('[data-i]', v).forEach(function (b) {
           b.onclick = function () {
