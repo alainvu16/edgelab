@@ -5,6 +5,9 @@ var RM = (function () {
   function S() { return App.S; }
   function rm() { var s = S(); if (!s.rm) s.rm = { self: {} }; return s.rm; }
   function cnt(o) { return Object.keys(o || {}).filter(function (k) { return o[k]; }).length; }
+  // Oct 18 ("are the circles accurate?"): rating steps use your real current rating (rated games + puzzles), not your best-ever puzzle score
+  function CR() { try { return App.ratingInfo('chess', function () { return CZ.estElo ? { r: CZ.estElo().elo, rd: 200 } : { r: 250, rd: 200 }; }).r; } catch (e) { return 250; } }
+  function XR() { try { return XQ.estElo().elo; } catch (e) { return 500; } }
   function frac(v, goal) { return Math.max(0, Math.min(1, (v || 0) / goal)); }
   // ToneBot course steps (Oct 17): the bot's own course questions, placed where they fit the order you learn in. No data yet = not a blocker.
   function tbStep(label, start, why) { return { label: label, why: why, p: function () { if (typeof TB === 'undefined' || !TB.hasQuiz()) return 1; var x = TB.courseProgress(start); return x == null ? 1 : x; }, go: function () { TB.courseContinue(start); } }; }
@@ -49,23 +52,23 @@ var RM = (function () {
       stages: [
         { t: 'Basics', why: 'The checklist and the core mating patterns.', steps: [
           { label: 'Curriculum lessons 1–5', p: function () { return frac(CZ.LESSONS.slice(0, 5).filter(CZ.lessonDone).length, 5); }, go: function () { nextChessLesson(); } },
-          { label: 'Puzzle rating 900', p: function () { return frac(((S().chess.peak || 800) - 800), 100); }, go: function () { CZ.puzzles({}); } },
+          { label: 'Rating 500', p: function () { return frac(CR() - 250, 250); }, go: function () { CZ.puzzles({}); } },
           { label: 'Beat the Rookie bot', p: function () { return (S().chess.botLevel || 1) > 1 ? 1 : 0; }, go: function () { CZ.play(1, 'w'); } }
         ] },
         { t: 'Tactics', why: 'Forks, pins, skewers and combinations decide most games below 1600.', steps: [
           { label: 'Tactics lessons complete', p: function () { return frac(CZ.LESSONS.slice(5, 8).filter(CZ.lessonDone).length, 3); }, go: function () { nextChessLesson(); } },
-          { label: 'Puzzle rating 1150', p: function () { return frac(((S().chess.peak || 800) - 900), 250); }, go: function () { CZ.puzzles({}); } },
+          { label: 'Rating 800', p: function () { return frac(CR() - 500, 300); }, go: function () { CZ.puzzles({}); } },
           { label: 'Board vision level 3', p: function () { return frac((S().chess.sqLvl || 1) - 1, 2); }, go: function () { CZ.vision(); } },
           { label: 'Beat the Club bot', p: function () { return (S().chess.botLevel || 1) > 3 ? 1 : frac((S().chess.botLevel || 1) - 1, 3); }, go: function () { CZ.playMenu(); } }
         ] },
         { t: 'Strategy', why: 'Openings with a plan, endgame technique, pawn structure.', steps: [
           { label: '3 openings mastered (3 stars)', p: function () { var o = S().chess.open || {}; return frac(Object.keys(o).filter(function (k) { return o[k] >= 3; }).length, 3); }, go: function () { CZ.openings(); } },
           { label: '5 endgames completed', p: function () { return frac(cnt(S().chess.endg), 5); }, go: function () { CZ.endgameMenu(); } },
-          { label: 'Puzzle rating 1350', p: function () { return frac(((S().chess.peak || 800) - 1150), 200); }, go: function () { CZ.puzzles({}); } },
+          { label: 'Rating 1100', p: function () { return frac(CR() - 800, 300); }, go: function () { CZ.puzzles({}); } },
           { label: 'Beat the Strong club bot', p: function () { return (S().chess.botLevel || 1) > 4 ? 1 : 0; }, go: function () { CZ.playMenu(); } }
         ] },
         { t: 'Your edge', why: 'Calculation, creativity and real opponents.', steps: [
-          { label: 'Puzzle rating 1500', p: function () { return frac(((S().chess.peak || 800) - 1350), 150); }, go: function () { CZ.puzzles({}); } },
+          { label: 'Rating 1500', p: function () { return frac(CR() - 1100, 400); }, go: function () { CZ.puzzles({}); } },
           { label: 'Average game accuracy 75%+', p: function () { var a = (S().chess.acc || []).slice(-5); if (a.length < 3) return frac(a.length, 3) * 0.5; return frac(a.reduce(function (x, y) { return x + y; }, 0) / a.length, 75); }, go: function () { CZ.playMenu(); } },
           { label: 'Beat the Shark bot', p: function () { return (S().chess.botLevel || 1) > 6 ? 1 : 0; }, go: function () { CZ.playMenu(); } },
           selfStep('chess_online', 'Play 20 rated games online (lichess or chess.com)', 'Bots are predictable. Your real rating comes from people.')
@@ -106,7 +109,7 @@ var RM = (function () {
         ] },
         { t: 'Openings & tactics', why: 'Central cannon, screen horses, and the cannon-horse-chariot tactics.', steps: [
           { label: 'Opening and tactics lessons', p: function () { return frac(XQ.LESSONS.slice(6, 14).filter(function (l) { return (S().xq.lessons || {})[l.id]; }).length, 8); }, go: function () { nextXqLesson(6, 14); } },
-          { label: 'Puzzle rating 1000', p: function () { return frac((S().xq.prating || 800) - 800, 200); }, go: function () { XQ.puzzles(); } },
+          { label: 'Rating 800', p: function () { return frac(XR() - 500, 300); }, go: function () { XQ.puzzles(); } },
           { label: 'Beat the Teahouse bot', p: function () { return (S().xq.level || 1) > 3 ? 1 : frac((S().xq.level || 1) - 1, 3); }, go: function () { XQ.playMenu(); } }
         ] },
         { t: 'Strategy & endgames', why: 'Defense, trades, and the endgames most players never learn.', steps: [
@@ -115,7 +118,7 @@ var RM = (function () {
           { label: 'Beat the Club bot', p: function () { return (S().xq.level || 1) > 4 ? 1 : 0; }, go: function () { XQ.playMenu(); } }
         ] },
         { t: 'Your edge', why: 'Deep calculation and real opponents.', steps: [
-          { label: 'Puzzle rating 1300', p: function () { return frac((S().xq.prating || 800) - 1000, 300); }, go: function () { XQ.puzzles(); } },
+          { label: 'Rating 1200', p: function () { return frac(XR() - 800, 400); }, go: function () { XQ.puzzles(); } },
           { label: 'Beat the Master bot', p: function () { return (S().xq.level || 1) > 6 ? 1 : 0; }, go: function () { XQ.playMenu(); } },
           selfStep('xq_online', 'Play 20 games online (xiangqi.com)', 'Humans play openings and traps the bot never shows you.')
         ] }

@@ -975,6 +975,7 @@ var App = (function () {
         dial('poker', '&#9824;&#xFE0E;', 'Poker', 'Lv ' + ((S.poker && S.poker.level) || 1), path.poker || 0) +
         dial('xq', '炮', 'Xiangqi', xel, path.xq || 0, true) +
       '</div>' +
+      '<p class="small mute" style="text-align:center;margin:-4px 0 0">Rings: how far along your path to an edge · numbers: rating or level</p>' +
       '<button class="btn primary hqp" id="qp">' + (QP.active && !QP.only ? 'Resume quick play' : 'Quick play') + '<span>' + (QP.active && !QP.only ? 'Keeps rotating what you need most until you stop it' : 'The app picks what you need most and keeps rotating until you stop') + '</span></button>' +
       '</section>';
   }
