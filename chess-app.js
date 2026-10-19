@@ -366,13 +366,16 @@ var CZ = (function () {
   function later(fn, ms) { setTimeout(fn, ms || 30); }
 
   // ---------------- estimated Elo ----------------
-  var BOT_ELO = [0, 350, 550, 850, 1100, 1350, 1600, 1800];
-  function estElo() {
-    var c = st(), acc = c.acc && c.acc.length ? c.acc.slice(-5).reduce(function (a, b) { return a + b; }, 0) / Math.min(5, c.acc.length) : null;
-    var base = 0.5 * c.rating + 0.5 * BOT_ELO[c.botLevel];
-    if (acc != null) base += (acc - 65) * 5;
-    var games = c.games.w + c.games.l + c.games.d;
-    return { elo: Math.round(Math.max(300, Math.min(2200, base)) / 10) * 10, conf: games < 3 ? 'rough' : games < 10 ? 'fair' : 'good' };
+  // Oct 18: a real rating (App.rate, Glicko) replaces the old estimate. Bots are rated at their labels; puzzles count at 0.3 weight.
+  // Starting point: Alain's online blitz rating of 250 (he wasn't sure it's accurate, so the range starts wide).
+  function botR(lv) { return parseInt(String(BOTS[lv - 1].elo).replace(/\D/g, ''), 10) || 800; }
+  function seedR() { return { r: 250, rd: 200, from: 'your online blitz rating (250, Oct 18)' }; }
+  function estElo() { var i = App.ratingInfo('chess', seedR); return { elo: i.r, lo: i.lo, hi: i.hi, conf: i.conf, prov: i.prov, games: i.games, from: i.from }; }
+  function ratingLine() { var e = estElo(); return 'Likely ' + e.lo + '–' + e.hi + ' · ' + e.games + ' rated game' + (e.games === 1 ? '' : 's') + (e.prov ? ' · provisional' : ''); }
+  function setOnline() {
+    var sh = App.modal('<div class="grab"></div><span class="eyebrow">Chess rating</span><h2>Your online rating</h2><p class="small mute">Enter your current blitz or rapid rating from Chess.com or Lichess. The app starts from it, and your rated games here move it from there.</p><input id="onr" type="number" inputmode="numeric" min="100" max="3000" style="width:100%;font-size:18px;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg)" placeholder="e.g. 250"><div class="btns"><button class="btn primary" id="ons">Save</button><button class="btn" id="onx">Cancel</button></div>');
+    App.$('#ons', sh).onclick = function () { var r = parseInt(App.$('#onr', sh).value, 10); if (r >= 100 && r <= 3000) { App.setRating('chess', r, 150, 'your online rating (' + r + ')'); App.closeModal(); home(); } };
+    App.$('#onx', sh).onclick = App.closeModal;
   }
   // ---------------- screens ----------------
   function home() {
@@ -381,7 +384,7 @@ var CZ = (function () {
       var nextL = null; for (var i = 0; i < LESSONS.length; i++) if (!lessonDone(LESSONS[i])) { nextL = i; break; }
       var rep = report()[0];
       var ee = estElo();
-      v.innerHTML = '<div><span class="eyebrow">Chess</span><h1>Est. Elo ' + ee.elo + '</h1><p class="mute small">Puzzle rating ' + c.rating + ' (peak ' + (c.peak || c.rating) + ') · Bot level ' + c.botLevel + ' · ' + c.games.w + 'W ' + c.games.l + 'L ' + c.games.d + 'D · estimate is ' + ee.conf + (ee.conf === 'rough' ? ', play more games to sharpen it' : '') + '</p></div>' + App.playNowBtn('chess') +
+      v.innerHTML = '<div><span class="eyebrow">Chess</span><h1>Rating ' + ee.elo + '</h1><p class="mute small">' + ratingLine() + ' · Puzzle rating ' + c.rating + ' · Bot level ' + c.botLevel + ' · ' + c.games.w + 'W ' + c.games.l + 'L ' + c.games.d + 'D</p><button class="btn sm ghost" id="onl">Update my online rating</button></div>' + App.playNowBtn('chess') +
         '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + rep.text + '</p><button class="btn sm" id="repgo">' + esc(rep.action) + ' ›</button></div>' +
         '<div class="btns"><button class="btn" id="pz">Puzzles</button><button class="btn" id="pl">Play bot</button><button class="btn" id="op">Openings</button><button class="btn" id="bv">Board vision</button><button class="btn" id="eg">Endgames</button><button class="btn" id="ob">Outside the box</button></div>' +
         '<h2>Curriculum</h2><div class="list" id="ls"></div>';
@@ -397,6 +400,7 @@ var CZ = (function () {
       App.wirePlayNow(v, 'chess');
       $('#pz', v).onclick = function () { puzzles({}); };
       $('#repgo', v).onclick = rep.go;
+      $('#onl', v).onclick = setOnline;
       $('#pl', v).onclick = playMenu;
       $('#op', v).onclick = openings;
       $('#bv', v).onclick = vision;
@@ -616,6 +620,7 @@ var CZ = (function () {
       function rate(score) {
         if (!first) return; first = false;
         c.rating = App.elo(c.rating, p.r, score, 36); c.peak = Math.max(c.peak || 0, c.rating);
+        App.rate('chess', p.r, score, { weight: 0.3, oppRD: 120, seed: seedR, why: 'puzzle' });
         c.seen[p.id] = Object.keys(c.seen).length + 1;
         c.theme = c.theme || {}; var th = c.theme[p.th] || { ok: 0, n: 0 }; th.n++; th.ok += score; c.theme[p.th] = th; App.save();
       }
@@ -857,10 +862,12 @@ var CZ = (function () {
     var bot = BOTS[lv - 1];
     App.screen(bot.name + ' bot' + (casual ? ' · just play' : ''), function (v) {
       var g = new Chess(), busy = false, over = false, log = [];
-      v.innerHTML = '<div class="row"><span class="pill acc">You: ' + (my === 'w' ? 'White' : 'Black') + '</span><span class="pill">Bot Lv ' + lv + ' ' + bot.elo + '</span></div>' +
+      v.innerHTML = '<div class="row"><span class="pill acc">You: ' + (my === 'w' ? 'White' : 'Black') + '</span><span class="pill">Bot Lv ' + lv + ' ' + bot.elo + '</span>' + (casual ? '' : '<span class="pill" id="rt"></span>') + '</div>' +
         '<div id="bd"></div><div id="watch"></div><div id="co"></div><div id="op" class="small mute"></div><div class="moves" id="mv"></div>' +
         '<div class="btns" id="bt"><button class="btn" id="hn">Hint</button><button class="btn" id="tb">Take back</button><button class="btn ghost" id="rs">Resign</button></div>' + (casual ? '' : '<button class="btn sm ghost" id="ind" style="width:100%"></button>');
       var co = $('#co', v), opEl = $('#op', v), cst = st(); if (cst.ind === undefined) cst.ind = true;
+      var assisted = false; // any hint, take-back or best-move indicator makes the game unrated (practice)
+      function ratedPill(why) { if (why) assisted = assisted || why; var p0 = v.querySelector('#rt'); if (p0) p0.textContent = assisted ? 'Unrated · ' + assisted : 'Rated'; }
       var B = mount($('#bd', v), g, { flip: my === 'b', canMove: function () { return !busy && !over && g.turn() === my; }, onMove: onMove });
       // Oct 18 (Alain: "indicators to show proper moves"): when on, your best move is marked every turn (piece ring + green dot) with the reason
       function indLabel() { var b = v.querySelector('#ind'); if (b) b.textContent = 'Best-move indicator: ' + (cst.ind ? 'On' : 'Off'); }
@@ -869,7 +876,7 @@ var CZ = (function () {
         var fen = g.fen();
         App.engine({ game: 'chess', op: 'best', fen: fen, depth: 3, ms: 700 }).then(function (r) {
           if (over || !cst.ind || g.fen() !== fen || !r || !r.move) return;
-          B.ui.hint = { from: r.move.from, to: r.move.to }; B.render();
+          B.ui.hint = { from: r.move.from, to: r.move.to }; B.render(); ratedPill('indicator on');
           var sg = v.querySelector('#sg'); if (!sg) { sg = document.createElement('div'); sg.id = 'sg'; $('#watch', v).before(sg); }
           sg.innerHTML = App.coachHTML('info', '<b>Best move: ' + esc(r.move.san) + '</b> (ringed piece → green dot): ' + idea(fen, r.move.san) + '.');
         });
@@ -944,6 +951,8 @@ var CZ = (function () {
           return;
         }
         c.games[res]++;
+        var rr = assisted ? null : App.rate('chess', botR(lv), res === 'w' ? 1 : res === 'd' ? 0.5 : 0, { seed: seedR, why: (res === 'w' ? 'Win' : res === 'd' ? 'Draw' : 'Loss') + ' vs ' + bot.name });
+        var rateNote = rr ? 'Rating ' + rr.before + ' → <b>' + rr.after + '</b> (' + (rr.delta >= 0 ? '+' : '') + rr.delta + '). ' : 'Not rated: ' + assisted + '. Turn the best-move indicator off and skip hints and take-backs for a rated game. ';
         var accs = log.map(function (a) { return 100 * Math.exp(-a.loss / 300); });
         var acc = accs.length ? Math.round(accs.reduce(function (x, y) { return x + y; }, 0) / accs.length) : 0;
         c.acc = (c.acc || []).concat([acc]).slice(-20);
@@ -958,7 +967,7 @@ var CZ = (function () {
           c.lossStreak >= 2 ? 'Two losses in a row: drop a level or do puzzles on your weakest theme, then come back.' : 'Review your worst move below, then run it back.';
         co.innerHTML = '<div class="panel"><h2>' + title + '</h2><div class="stats"><div class="stat"><span class="v">' + acc + '%</span><span class="k">Accuracy</span></div>' +
           ['best', 'good', 'inacc', 'mistake', 'blunder'].map(function (k) { return '<div class="stat"><span class="v">' + (counts[k] || 0) + '</span><span class="k">' + { best: 'Best', good: 'Good', inacc: 'Inaccuracies', mistake: 'Mistakes', blunder: 'Blunders' }[k] + '</span></div>'; }).join('') +
-          '</div><p>' + push + '</p></div>' + (worst && worst.loss > 50 ? App.coachHTML(worst.grade, '<b>Biggest swing:</b> ' + worst.text) : '') + WZ.card(res === 'w' ? (lvUp ? 'level' : 'win') : 'loss', true);
+          '</div><p>' + rateNote + push + '</p></div>' + (worst && worst.loss > 50 ? App.coachHTML(worst.grade, '<b>Biggest swing:</b> ' + worst.text) : '') + WZ.card(res === 'w' ? (lvUp ? 'level' : 'win') : 'loss', true);
         opEl.textContent = '';
         $('#bt', v).innerHTML = '<button class="btn primary" id="ag">' + (lvUp ? 'Play level ' + (lv + 1) : 'Play again') + '</button><button class="btn" id="dn">Done</button>';
         $('#ag').onclick = function () { App.checkpoint(function () { App.back(); play(lvUp ? lv + 1 : lv, my); }); };
@@ -966,17 +975,18 @@ var CZ = (function () {
         if (lvUp && lv + 1 >= 4) WZ.onlineNudge('chess');
       }
       $('#hn', v).onclick = function () {
-        if (busy || over || g.turn() !== my) return;
+        if (busy || over || g.turn() !== my) return; ratedPill('hint used');
         busy = true; co.innerHTML = '<div class="thinking">Looking for the best move</div>';
         App.engine({ game: 'chess', op: 'best', fen: g.fen(), depth: 3, ms: 800 }).then(function (r) { if (over) return; B.ui.hint = { from: r.move.from, to: r.move.to }; B.render(); busy = false; co.innerHTML = App.coachHTML('info', 'Try <b>' + esc(r.move.san) + '</b>: ' + idea(g.fen(), r.move.san) + '.'); });
       };
       $('#tb', v).onclick = function () {
-        if (busy || over) return;
+        if (busy || over) return; ratedPill('take-back used');
         if (g.turn() === my && g.history().length >= 2) { g.undo(); g.undo(); log.pop(); }
         else if (g.turn() !== my && g.history().length) { g.undo(); log.pop(); }
         B.ui.last = null; B.ui.hint = null; B.render(); moveList(); co.innerHTML = App.coachHTML('info', 'Taken back. Your move.'); opEl.textContent = ''; indicate();
       };
       $('#rs', v).onclick = function () { if (!over) { co.innerHTML = ''; finish('l'); } };
+      ratedPill();
       if (my === 'b') { busy = true; botMove(); } else { showWatch(); indicate(); }
     });
   }

@@ -807,13 +807,36 @@ var App = (function () {
   });
 
   // ---------- adaptive helpers ----------
+  // ---------- real ratings (Oct 18, Alain: "I want real ratings") ----------
+  // Glicko-1, like Lichess's older system: a rating r and a deviation rd (how sure we are). Every rated game and puzzle moves it,
+  // weighted by the opponent's strength; rd shrinks as you play and grows slowly when you don't. Shown as r with a likely range r ± 2·rd.
+  // Puzzles count at reduced weight; games with any help (hint, take-back, best-move indicator, guided) don't count.
+  var GQ = Math.LN10 / 400;
+  function gRD(rd) { return 1 / Math.sqrt(1 + 3 * GQ * GQ * rd * rd / (Math.PI * Math.PI)); }
+  function rating(game, seed) {
+    S.rating = S.rating || {}; var x = S.rating[game];
+    if (!x) { var s0 = seed ? seed() : { r: 800, rd: 350 }; x = S.rating[game] = { r: s0.r, rd: s0.rd || 350, games: 0, puzzles: 0, t: Date.now(), hist: [], from: s0.from || '' }; save(); }
+    var days = Math.max(0, (Date.now() - x.t) / 864e5); x.rdNow = Math.min(350, Math.sqrt(x.rd * x.rd + 100 * days)); // +10 rd per sqrt(day) idle
+    return x;
+  }
+  function rate(game, oppR, score, opt) {
+    opt = opt || {}; var x = rating(game, opt.seed), w = opt.weight || 1, rd = x.rdNow, g = gRD(opt.oppRD || 60);
+    var E = 1 / (1 + Math.pow(10, -g * (x.r - oppR) / 400)), info = w * GQ * GQ * g * g * E * (1 - E), denom = 1 / (rd * rd) + info;
+    var before = x.r; x.r = Math.max(100, Math.min(3000, x.r + (GQ / denom) * g * (score - E) * w)); x.rd = Math.max(45, Math.sqrt(1 / denom)); x.t = Date.now();
+    if (w >= 1) x.games++; else x.puzzles++;
+    var delta = Math.round(x.r) - Math.round(before);
+    x.hist = (x.hist || []).concat([{ d: dayKey(new Date()), r: Math.round(x.r), dl: delta, why: opt.why || '' }]).slice(-60); save();
+    return { before: Math.round(before), after: Math.round(x.r), delta: delta };
+  }
+  function ratingInfo(game, seed) { var x = rating(game, seed), rd = x.rdNow; return { r: Math.round(x.r), lo: Math.max(100, Math.round(x.r - 2 * rd)), hi: Math.round(x.r + 2 * rd), rd: rd, games: x.games, puzzles: x.puzzles, prov: x.games < 10 || rd > 110, conf: rd > 150 ? 'rough' : rd > 90 ? 'fair' : 'good', from: x.from }; }
+  function setRating(game, r, rd, from) { var x = rating(game); x.r = r; x.rd = rd; x.t = Date.now(); x.from = from || ''; x.hist = (x.hist || []).concat([{ d: dayKey(new Date()), r: r, dl: 0, why: from || 'set' }]).slice(-60); save(); }
   function elo(r, opp, score, k) { var e = 1 / (1 + Math.pow(10, (opp - r) / 400)); return Math.round(r + (k || 32) * (score - e)); }
 
   // ---------- home ----------
   function levelStats() {
     var c = S.chess, x = S.xq, p = S.poker, m = S.mkt;
     return [
-      ['Chess est. Elo', typeof CZ !== 'undefined' ? CZ.estElo().elo : '—'], ['Chess puzzles', c.rating || 800],
+      ['Chess rating', typeof CZ !== 'undefined' ? CZ.estElo().elo : '—'], ['Chess puzzles', c.rating || 800],
       ['Xiangqi bot', 'Lv ' + (x.level || 1)], ['Poker', 'Lv ' + (p.level || 1)], ['Markets', 'Lv ' + (m.level || 1)]
     ].map(function (a) { return '<div class="stat"><span class="v">' + a[1] + '</span><span class="k">' + a[0] + '</span></div>'; }).join('');
   }
@@ -1009,7 +1032,7 @@ var App = (function () {
   }
 
   return {
-    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, freshPick: freshPick, recentHas: recentHas, recentAdd: recentAdd, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
+    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, rating: rating, rate: rate, ratingInfo: ratingInfo, setRating: setRating, freshPick: freshPick, recentHas: recentHas, recentAdd: recentAdd, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
     st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, playNow: playNow, playNowBtn: playNowBtn, wirePlayNow: wirePlayNow, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, addDays: addDays, dayKey: dayKey, streak: function () { return streak(); }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }

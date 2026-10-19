@@ -254,16 +254,14 @@ var XQ = (function () {
     }
   }
 
-  var LV_ELO = [500, 750, 1000, 1200, 1400, 1650, 1850];
-  function estElo() {
-    var x = st(), games = x.games.w + x.games.l + x.games.d;
-    var base = LV_ELO[x.level - 1] + (x.acc && x.acc.length ? (x.acc.slice(-5).reduce(function (a, b) { return a + b; }, 0) / Math.min(5, x.acc.length) - 65) * 5 : 0);
-    return { elo: Math.round(Math.max(300, Math.min(2200, base)) / 10) * 10, conf: games < 3 ? 'rough' : games < 10 ? 'fair' : 'good' };
-  }
+  // Oct 18: real rating (App.rate, Glicko). Bots rated by level; puzzles count at 0.2 weight; guided and assisted games don't count.
+  var LV_ELO = [500, 750, 1000, 1200, 1400, 1650, 1850, 2000];
+  function seedR() { var x = st(), g = x.games.w + x.games.l + x.games.d; return { r: Math.max(300, LV_ELO[Math.min(LV_ELO.length, x.level) - 1] - (g && x.games.w / g < 0.3 ? 150 : 0)), rd: g ? 250 : 300, from: 'your bot level and record so far' }; }
+  function estElo() { var i = App.ratingInfo('xq', seedR); return { elo: i.r, lo: i.lo, hi: i.hi, conf: i.conf, prov: i.prov, games: i.games }; }
   function home() {
     App.root('Xiangqi', function (v) {
       var x = st(), ee = estElo();
-      v.innerHTML = '<div><span class="eyebrow">Xiangqi · Chinese chess</span><h1>Est. Elo ' + ee.elo + '</h1><p class="mute small">Bot level ' + x.level + ' · ' + x.games.w + 'W ' + x.games.l + 'L ' + x.games.d + 'D · estimate is ' + ee.conf + (ee.conf === 'rough' ? ', play more games to sharpen it' : '') + '</p></div>' + App.playNowBtn('xq') +
+      v.innerHTML = '<div><span class="eyebrow">Xiangqi · Chinese chess</span><h1>Rating ' + ee.elo + '</h1><p class="mute small">Likely ' + ee.lo + '–' + ee.hi + ' · ' + ee.games + ' rated game' + (ee.games === 1 ? '' : 's') + (ee.prov ? ' · provisional' : '') + ' · Bot level ' + x.level + ' · ' + x.games.w + 'W ' + x.games.l + 'L ' + x.games.d + 'D</p></div>' + App.playNowBtn('xq') +
         (function () { var r = report()[0]; return '<div class="coach ok"><div class="h"><span class="pill ok">Coach</span></div><p>' + r.text + '</p><button class="btn sm" id="repgo">' + r.action + ' ›</button></div>'; })() +
         '<div class="btns"><button class="btn" id="pl">Play bot</button><button class="btn" id="dr">Move trainer</button><button class="btn" id="ch">Characters</button>' + (XP.length ? '<button class="btn" id="pz">Puzzles</button>' : '') + (BOOK.length ? '<button class="btn" id="ob">Opening book</button>' : '') + '</div>' +
         '<div class="row"><label class="row small"><input type="checkbox" id="lb"' + (x.labels ? ' checked' : '') + '> Show English letters on pieces</label></div>' +
@@ -369,7 +367,7 @@ var XQ = (function () {
       v.innerHTML = '<div class="row"><span class="pill acc">' + (p.turn === 'r' ? 'Red' : 'Black') + ' to move</span><span class="pill">' + LABEL[p.kind] + ' · ~' + p.rating + '</span><span class="grow"></span><span class="mono small mute">Rating ' + x.prating + '</span></div><div id="bd"></div><div id="co"></div><div class="btns"><button class="btn" id="hn">Hint</button><button class="btn ghost" id="sol">Show solution</button></div>';
       var co = $('#co', v), start = { b: p.b, turn: p.turn, hist: [], ply: 0 };
       function solved(m, pos) {
-        done = true; if (first) { x.prating = App.elo(x.prating, p.rating, 1, 36); } x.psolved[pick.i] = 1; App.save();
+        done = true; if (first) { x.prating = App.elo(x.prating, p.rating, 1, 36); App.rate('xq', p.rating, 1, { weight: 0.2, oppRD: 150, seed: seedR, why: 'puzzle' }); } x.psolved[pick.i] = 1; App.save();
         co.innerHTML = App.coachHTML('right', (two ? 'Checkmate. ' : '') + '<b>' + mvText(pos, m) + '</b>: ' + xIdea(pos, m) + '.', '<span class="mono small">→ ' + x.prating + '</span>');
         nextBtn();
       }
@@ -387,7 +385,7 @@ var XQ = (function () {
           E.make(s, m); B.ui.last = m; B.ui.hint = null; B.render();
           if (two && stage === 0 && E.legal(s).length) { co.innerHTML = '<div class="thinking">They look for a defense</div>'; reply(); return; }
           solved(m, pos);
-        } else { if (first) { x.prating = App.elo(x.prating, p.rating, 0, 36); App.save(); } first = false; B.render(); co.innerHTML = App.coachHTML('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it. ' + (p.kind === 'win' ? 'Look for a capture or fork that wins material by force.' : two && stage === 0 ? 'Mate in 2 starts with a forcing move, usually a check, that leaves every defense losing.' : 'Look for a move after which the general has no escape and nothing can block or capture.') + ' Try again.'); }
+        } else { if (first) { x.prating = App.elo(x.prating, p.rating, 0, 36); App.rate('xq', p.rating, 0, { weight: 0.2, oppRD: 150, seed: seedR, why: 'puzzle' }); App.save(); } first = false; B.render(); co.innerHTML = App.coachHTML('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it. ' + (p.kind === 'win' ? 'Look for a capture or fork that wins material by force.' : two && stage === 0 ? 'Mate in 2 starts with a forcing move, usually a check, that leaves every defense losing.' : 'Look for a move after which the general has no escape and nothing can block or capture.') + ' Try again.'); }
       } });
       co.innerHTML = App.coachHTML('info', p.kind === 'mate' ? 'Find the checkmate in one move.' : two ? 'Checkmate in two moves: find a forcing first move. Whatever they answer, you mate next.' : 'Find the move that wins material.');
       function hintMove() { return two && stage === 1 ? mateIn1(s)[0] : two ? (E.legal(s).filter(function (m) { return forcesMate2(s, m); })[0] || p.sol[0]) : p.sol[0]; }
@@ -421,19 +419,20 @@ var XQ = (function () {
     var bot = BOTS[lv - 1]; if (guided) casual = false;
     App.screen(bot.name + ' bot' + (guided ? ' · guided' : casual ? ' · just play' : ''), function (v) {
       var s = E.start(), busy = false, over = false, log = [], reps = {};
-      v.innerHTML = '<div class="row"><span class="pill acc">You: Red</span><span class="pill">Bot Lv ' + lv + '</span><span class="grow"></span><span class="mono small mute" id="pc"></span></div><div id="bd"></div><div id="watch"></div><div id="co"></div><div id="op" class="small mute"></div>' +
+      v.innerHTML = '<div class="row"><span class="pill acc">You: Red</span><span class="pill">Bot Lv ' + lv + ' ~' + LV_ELO[lv - 1] + '</span>' + (casual || guided ? '' : '<span class="pill" id="rt"></span>') + '<span class="grow"></span><span class="mono small mute" id="pc"></span></div><div id="bd"></div><div id="watch"></div><div id="co"></div><div id="op" class="small mute"></div>' +
         '<div class="btns" id="bt"><button class="btn" id="hn">Hint</button><button class="btn" id="tb">Take back</button><button class="btn ghost" id="rs">Resign</button></div>' + (casual || guided ? '' : '<button class="btn sm ghost" id="ind" style="width:100%"></button>');
       var co = $('#co', v), opEl = $('#op', v);
       var B = mount($('#bd', v), s, { canMove: function () { return !busy && !over && s.turn === 'r'; }, onMove: onMove });
       co.innerHTML = casual ? '' : App.coachHTML('info', guided ? '<b>Guided game.</b> Every turn the coach marks a good move (ringed piece, green dot where it goes) and says why. Follow it, or try your own: either way you get graded, and this game doesn’t count toward your record.' : 'Your move. A classic start: cannon to the center file (b3 or h3 to e3).');
       var xs = st(); if (xs.ind === undefined) xs.ind = true;
+      var assisted = false; function ratedPill(why) { if (why) assisted = assisted || why; var p0 = v.querySelector('#rt'); if (p0) p0.textContent = assisted ? 'Unrated · ' + assisted : 'Rated'; }
       function indLabel() { var b = v.querySelector('#ind'); if (b) b.textContent = 'Best-move indicator: ' + (xs.ind ? 'On' : 'Off'); }
       if (!casual && !guided) { indLabel(); v.querySelector('#ind').onclick = function () { xs.ind = !xs.ind; App.save(); indLabel(); if (xs.ind) suggest(); else { B.ui.hint = null; B.render(); var sg = v.querySelector('#sg'); if (sg) sg.innerHTML = ''; } }; }
-      showWatch(); suggest();
+      ratedPill(); showWatch(); suggest();
       function suggest() { // guided games, or the best-move indicator in coached games: highlight a good move with the reason
         if (!(guided || (!casual && xs.ind)) || over || s.turn !== 'r') return;
         App.engine({ game: 'xq', op: 'best', b: s.b, turn: s.turn, ply: s.ply, depth: 3, ms: 700 }).then(function (r) {
-          if (over || s.turn !== 'r' || !r || !r.move || !(guided || xs.ind)) return; B.ui.hint = r.move; B.render(); try {
+          if (over || s.turn !== 'r' || !r || !r.move || !(guided || xs.ind)) return; B.ui.hint = r.move; if (!guided) ratedPill('indicator on'); B.render(); try {
           var note = '<b>Suggested: ' + mvText(s, r.move) + '</b> (ringed piece → green dot): ' + xIdea(s, r.move, 'your', 'their') + '.';
           var sg = v.querySelector('#sg'); if (!sg) { sg = document.createElement('div'); sg.id = 'sg'; $('#watch', v).before(sg); } sg.innerHTML = App.coachHTML('info', note); } catch (e) {} // note: App.$ returns a blank div when nothing matches
         });
@@ -502,6 +501,8 @@ var XQ = (function () {
           return;
         }
         x.games[res]++;
+        var rr = assisted ? null : App.rate('xq', LV_ELO[lv - 1], res === 'w' ? 1 : res === 'd' ? 0.5 : 0, { seed: seedR, why: (res === 'w' ? 'Win' : res === 'd' ? 'Draw' : 'Loss') + ' vs ' + bot.name });
+        var rateNote = rr ? 'Rating ' + rr.before + ' → <b>' + rr.after + '</b> (' + (rr.delta >= 0 ? '+' : '') + rr.delta + '). ' : 'Not rated: ' + assisted + '. ';
         x.winsAt = x.winsAt || {}; if (res === 'w') x.winsAt[lv] = (x.winsAt[lv] || 0) + 1;
         var lvUp = res === 'w' && lv === x.level && lv < MAXLV && x.winsAt[lv] >= winsNeeded(lv);
         if (lvUp) x.level = Math.max(x.level, Math.min(MAXLV, lv + 1));
@@ -512,7 +513,7 @@ var XQ = (function () {
         x.acc = (x.acc || []).concat([acc]).slice(-20); App.save();
         var worst = log.slice().sort(function (a, b) { return b.loss - a.loss; })[0];
         co.innerHTML = '<div class="panel"><h2>' + (res === 'w' ? 'You won!' : res === 'l' ? 'Bot won' : 'Draw') + '</h2><div class="stats"><div class="stat"><span class="v">' + acc + '%</span><span class="k">Accuracy</span></div><div class="stat"><span class="v">' + log.length + '</span><span class="k">Your moves</span></div></div><p>' +
-          (lvUp ? 'Level ' + (lv + 1) + ' unlocked. It looks deeper, so slow down on captures.' : res === 'w' ? (lv === x.level && lv < MAXLV ? 'One more win here unlocks level ' + (lv + 1) + '.' : 'Try a higher level.') : 'Read your biggest swing below and run it back.') + '</p></div>' +
+          rateNote + (lvUp ? 'Level ' + (lv + 1) + ' unlocked. It looks deeper, so slow down on captures.' : res === 'w' ? (lv === x.level && lv < MAXLV ? 'One more win here unlocks level ' + (lv + 1) + '.' : 'Try a higher level.') : 'Read your biggest swing below and run it back.') + '</p></div>' +
           (worst && worst.loss > 50 ? App.coachHTML(worst.grade, '<b>Biggest swing:</b> ' + worst.text) : '') + WZ.card(res === 'w' ? (lvUp ? 'level' : 'win') : 'loss', true);
         opEl.textContent = '';
         $('#bt', v).innerHTML = '<button class="btn primary" id="ag">' + (lvUp ? 'Play level ' + (lv + 1) : 'Play again') + '</button><button class="btn" id="dn">Done</button>';
@@ -521,13 +522,13 @@ var XQ = (function () {
         if (lvUp && lv + 1 >= 4) WZ.onlineNudge('xq');
       }
       $('#hn', v).onclick = function () {
-        if (busy || over || s.turn !== 'r') return;
+        if (busy || over || s.turn !== 'r') return; ratedPill('hint used');
         busy = true; co.innerHTML = '<div class="thinking">Looking for the best move</div>';
         App.engine({ game: 'xq', op: 'best', b: s.b, turn: s.turn, ply: s.ply, depth: 3, ms: 700 }).then(function (r) { if (over) return; B.ui.hint = r.move; B.render(); busy = false; co.innerHTML = App.coachHTML('info', 'Try <b>' + mvText(s, r.move) + '</b>: ' + xIdea(s, r.move) + '.'); });
       };
       $('#tb', v).onclick = function () {
         if (busy || over || s.hist.length < 2) return;
-        E.undo(s); E.undo(s); log.pop(); B.ui.last = null; B.ui.hint = null; B.render(); co.innerHTML = App.coachHTML('info', 'Taken back. Your move.'); opEl.textContent = ''; suggest();
+        ratedPill('take-back used'); E.undo(s); E.undo(s); log.pop(); B.ui.last = null; B.ui.hint = null; B.render(); co.innerHTML = App.coachHTML('info', 'Taken back. Your move.'); opEl.textContent = ''; suggest();
       };
       $('#rs', v).onclick = function () { if (!over) finish('l'); };
     });
