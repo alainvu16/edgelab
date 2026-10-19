@@ -16,7 +16,7 @@ var XQ = (function () {
   ];
   var MAXLV = BOTS.length;
   function winsNeeded(lv) { return lv <= 3 ? 1 : 2; }
-  var XP = ((App.X().xqPuzzles) || []);
+  var XP = ((App.X().xqPuzzles) || []).concat(typeof XQ_MORE_PUZ !== 'undefined' ? XQ_MORE_PUZ : []); // Oct 18: mate-in-2 puzzles appended after the originals (progress is keyed by position)
   function st() {
     var x = App.S.xq;
     if (x.level == null) { x.level = 1; x.games = { w: 0, l: 0, d: 0 }; x.labels = true; x.drill = {}; x.lessons = {}; }
@@ -351,54 +351,92 @@ var XQ = (function () {
       next();
     });
   }
-  function puzzles() {
+  // mate-in-2 helpers (Oct 18): accept any first move that forces mate, then any mating move
+  function mateIn1(s0) { return E.legal(s0).filter(function (m) { var t = E.clone(s0); E.make(t, m); return !E.legal(t).length; }); }
+  function forcesMate2(s0, m) { var t = E.clone(s0); E.make(t, m); var rep = E.legal(t); if (!rep.length) return true; return rep.every(function (r) { var u = E.clone(t); E.make(u, r); return mateIn1(u).length > 0; }); }
+  function puzzles(opt) {
+    opt = opt || {};
     var x = st(); x.prating = x.prating || 800; x.psolved = x.psolved || {};
-    var pool = XP.map(function (p, i) { return { p: p, i: i }; }).filter(function (o) { return !x.psolved[o.i]; });
-    if (!pool.length) { x.psolved = {}; pool = XP.map(function (p, i) { return { p: p, i: i }; }); }
+    var all = XP.map(function (p, i) { return { p: p, i: i }; }).filter(function (o) { return !opt.kind || o.p.kind === opt.kind; });
+    var pool = all.filter(function (o) { return !x.psolved[o.i]; });
+    if (!pool.length) { all.forEach(function (o) { delete x.psolved[o.i]; }); pool = all; }
     pool.sort(function (a, b) { return Math.abs(a.p.rating - x.prating - 60) - Math.abs(b.p.rating - x.prating - 60); });
-    var pick = pool[Math.floor(Math.random() * Math.min(4, pool.length))], p = pick.p;
+    var pick = pool[Math.floor(Math.random() * Math.min(4, pool.length))], p = pick.p, two = p.kind === 'mate2';
+    var LABEL = { mate: 'Mate in 1', win: 'Win material', mate2: (p.end ? 'Endgame · ' : '') + 'Mate in 2' };
     App.screen('Xiangqi puzzles', function (v) {
-      var s = { b: p.b.slice(), turn: p.turn, hist: [], ply: 0 }, done = false, first = true;
-      v.innerHTML = '<div class="row"><span class="pill acc">' + (p.turn === 'r' ? 'Red' : 'Black') + ' to move</span><span class="pill">' + (p.kind === 'mate' ? 'Mate in 1' : 'Win material') + ' · ~' + p.rating + '</span><span class="grow"></span><span class="mono small mute">Rating ' + x.prating + '</span></div><div id="bd"></div><div id="co"></div><div class="btns"><button class="btn" id="hn">Hint</button><button class="btn ghost" id="sol">Show solution</button></div>';
-      var co = $('#co', v);
-      var B = mount($('#bd', v), s, { flip: p.turn === 'b', canMove: function () { return !done; }, onMove: function (m) {
-        var sol = p.sol[0], ok = m.f === sol.f && m.t === sol.t;
-        if (!ok) { var t2 = E.clone(s); E.make(t2, m); ok = p.kind === 'mate' && !E.legal(t2).length; }
-        if (ok) { E.make(s, m); B.ui.last = m; B.render(); done = true; if (first) { x.prating = App.elo(x.prating, p.rating, 1, 36); } x.psolved[pick.i] = 1; App.save();
-          co.innerHTML = App.coachHTML('right', '<b>' + mvText({ b: p.b, turn: p.turn }, m) + '</b>: ' + xIdea({ b: p.b, turn: p.turn, hist: [], ply: 0 }, m) + '.', '<span class="mono small">→ ' + x.prating + '</span>');
-          $('.btns', v).innerHTML = '<button class="btn primary" id="nx">Next puzzle</button>'; $('#nx').onclick = function () { App.checkpoint(function () { App.back(); puzzles(); }); };
-        } else { if (first) { x.prating = App.elo(x.prating, p.rating, 0, 36); App.save(); } first = false; B.render(); co.innerHTML = App.coachHTML('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it. ' + (p.kind === 'mate' ? 'Look for a move after which the general has no escape and nothing can block or capture.' : 'Look for a capture or fork that wins material by force.') + ' Try again.'); }
+      var s = { b: p.b.slice(), turn: p.turn, hist: [], ply: 0 }, done = false, first = true, stage = 0;
+      v.innerHTML = '<div class="row"><span class="pill acc">' + (p.turn === 'r' ? 'Red' : 'Black') + ' to move</span><span class="pill">' + LABEL[p.kind] + ' · ~' + p.rating + '</span><span class="grow"></span><span class="mono small mute">Rating ' + x.prating + '</span></div><div id="bd"></div><div id="co"></div><div class="btns"><button class="btn" id="hn">Hint</button><button class="btn ghost" id="sol">Show solution</button></div>';
+      var co = $('#co', v), start = { b: p.b, turn: p.turn, hist: [], ply: 0 };
+      function solved(m, pos) {
+        done = true; if (first) { x.prating = App.elo(x.prating, p.rating, 1, 36); } x.psolved[pick.i] = 1; App.save();
+        co.innerHTML = App.coachHTML('right', (two ? 'Checkmate. ' : '') + '<b>' + mvText(pos, m) + '</b>: ' + xIdea(pos, m) + '.', '<span class="mono small">→ ' + x.prating + '</span>');
+        nextBtn();
+      }
+      function nextBtn() { $('.btns', v).innerHTML = '<button class="btn primary" id="nx">Next puzzle</button>'; $('#nx').onclick = function () { App.checkpoint(function () { App.back(); puzzles(opt); }); }; }
+      function reply() { // the defender answers (any reply loses), then you finish it
+        var rs = E.legal(s), r = rs[Math.floor(Math.random() * rs.length)], before = E.clone(s);
+        setTimeout(function () { E.make(s, r); B.ui.last = r; B.render(); stage = 1; co.innerHTML = App.coachHTML('right', 'Good: that forces it. They answered <b>' + mvText(before, r) + '</b>. Now finish: checkmate in one.'); }, 550);
+      }
+      var B = mount($('#bd', v), s, { flip: p.turn === 'b', canMove: function () { return !done && s.turn === p.turn; }, onMove: function (m) {
+        var pos = E.clone(s), ok;
+        if (two && stage === 0) ok = forcesMate2(s, m);
+        else if (two) { var t1 = E.clone(s); E.make(t1, m); ok = !E.legal(t1).length; }
+        else { var sol = p.sol[0]; ok = m.f === sol.f && m.t === sol.t; if (!ok) { var t2 = E.clone(s); E.make(t2, m); ok = p.kind === 'mate' && !E.legal(t2).length; } }
+        if (ok) {
+          E.make(s, m); B.ui.last = m; B.ui.hint = null; B.render();
+          if (two && stage === 0 && E.legal(s).length) { co.innerHTML = '<div class="thinking">They look for a defense</div>'; reply(); return; }
+          solved(m, pos);
+        } else { if (first) { x.prating = App.elo(x.prating, p.rating, 0, 36); App.save(); } first = false; B.render(); co.innerHTML = App.coachHTML('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it. ' + (p.kind === 'win' ? 'Look for a capture or fork that wins material by force.' : two && stage === 0 ? 'Mate in 2 starts with a forcing move, usually a check, that leaves every defense losing.' : 'Look for a move after which the general has no escape and nothing can block or capture.') + ' Try again.'); }
       } });
-      co.innerHTML = App.coachHTML('info', p.kind === 'mate' ? 'Find the checkmate in one move.' : 'Find the move that wins material.');
-      $('#hn', v).onclick = function () { if (done) return; first = false; B.ui.hint = { f: p.sol[0].f, t: p.sol[0].f }; B.render(); co.innerHTML = App.coachHTML('info', 'Move the highlighted piece.'); };
-      $('#sol', v).onclick = function () { if (done) return; first = false; done = true; E.make(s, p.sol[0]); B.ui.last = p.sol[0]; B.render(); co.innerHTML = App.coachHTML('info', '<b>' + mvText({ b: p.b, turn: p.turn }, p.sol[0]) + '</b>: ' + xIdea({ b: p.b, turn: p.turn, hist: [], ply: 0 }, p.sol[0]) + '.'); $('.btns', v).innerHTML = '<button class="btn primary" id="nx">Next puzzle</button>'; $('#nx').onclick = function () { App.checkpoint(function () { App.back(); puzzles(); }); }; };
+      co.innerHTML = App.coachHTML('info', p.kind === 'mate' ? 'Find the checkmate in one move.' : two ? 'Checkmate in two moves: find a forcing first move. Whatever they answer, you mate next.' : 'Find the move that wins material.');
+      function hintMove() { return two && stage === 1 ? mateIn1(s)[0] : two ? (E.legal(s).filter(function (m) { return forcesMate2(s, m); })[0] || p.sol[0]) : p.sol[0]; }
+      $('#hn', v).onclick = function () { if (done) return; first = false; var h = hintMove(); B.ui.hint = { f: h.f, t: h.f }; B.render(); co.innerHTML = App.coachHTML('info', 'Move the highlighted piece.'); };
+      $('#sol', v).onclick = function () {
+        if (done) return; first = false; done = true;
+        var m1 = hintMove(), pos = E.clone(s); E.make(s, m1); B.ui.last = m1; B.render();
+        var txt = '<b>' + mvText(pos, m1) + '</b>: ' + xIdea(pos, m1) + '.';
+        if (two && stage === 0 && E.legal(s).length) { var r = E.legal(s)[0], pr = E.clone(s); E.make(s, r); var m3 = mateIn1(s)[0], p3 = E.clone(s); E.make(s, m3); B.ui.last = m3; B.render(); txt += ' If they answer <b>' + mvText(pr, r) + '</b>, <b>' + mvText(p3, m3) + '</b> is mate.'; }
+        co.innerHTML = App.coachHTML('info', txt); nextBtn();
+      };
     });
   }
   function playMenu() {
     App.screen('Play the bot', function (v) {
       var x = st();
-      v.innerHTML = '<p class="mute">You play Red and move first. Every move gets graded and explained.</p><div class="seg" id="md"><button aria-pressed="true" data-m="coach">Coached</button><button aria-pressed="false" data-m="casual">Just play</button></div><div class="list">' + BOTS.map(function (b) {
+      v.innerHTML = '<p class="mute">You play Red and move first. Every move gets graded and explained.</p><div class="seg" id="md"><button aria-pressed="' + (!ready()) + '" data-m="guided">Guided</button><button aria-pressed="' + ready() + '" data-m="coach">Coached</button><button aria-pressed="false" data-m="casual">Just play</button></div><div class="list">' + BOTS.map(function (b) {
         var open = b.lv <= x.level;
         return '<button class="item' + (open ? '' : ' locked') + (b.lv < x.level ? ' done' : '') + '" data-b="' + b.lv + '"><span class="grow"><span class="t">' + b.lv + '. ' + b.name + '</span><br><span class="s">Looks ' + b.depth + ' move' + (b.depth > 1 ? 's' : '') + ' ahead</span></span><span class="end">' + (b.lv < x.level ? '✓ beaten' : open ? 'play ›' : 'locked') + '</span></button>';
       }).join('') + '</div>';
-      var mode = 'coach';
-      $$('[data-m]', v).forEach(function (b) { b.onclick = function () { mode = b.dataset.m; $$('[data-m]', v).forEach(function (q) { q.setAttribute('aria-pressed', q === b); }); $$('[data-b]', v).forEach(function (q) { q.classList.toggle('locked', mode !== 'casual' && +q.dataset.b > st().level); }); }; });
-      $$('[data-b]', v).forEach(function (b) { b.onclick = function () { var lv = +b.dataset.b; if (mode === 'casual' || lv <= st().level) play(lv, mode === 'casual'); }; });
+      var mode = ready() ? 'coach' : 'guided';
+      $$('[data-m]', v).forEach(function (b) { b.onclick = function () { mode = b.dataset.m; $$('[data-m]', v).forEach(function (q) { q.setAttribute('aria-pressed', q === b); }); $$('[data-b]', v).forEach(function (q) { q.classList.toggle('locked', mode === 'coach' && +q.dataset.b > st().level); }); }; });
+      $$('[data-b]', v).forEach(function (b) { b.onclick = function () { var lv = +b.dataset.b; if (mode !== 'coach' || lv <= st().level) play(lv, mode === 'casual', mode === 'guided'); }; });
     });
   }
-  function play(lv, casual) {
-    var bot = BOTS[lv - 1];
-    App.screen(bot.name + ' bot' + (casual ? ' · just play' : ''), function (v) {
+  // Oct 18 (Alain: "I barely know how to play … it won't teach me how to actually play before playing the bot"):
+  // guided games suggest a good move every turn with the reason; they don't count toward your record.
+  // Regular bot games come into quick play only once you're ready: rules lessons, 10 puzzles, 2 guided games.
+  function ready() { var x = st(); return LESSONS.slice(0, 6).every(function (l) { return x.lessons[l.id]; }) && Object.keys(x.psolved || {}).length >= 10 && (x.guided || 0) >= 2; }
+  function play(lv, casual, guided) {
+    var bot = BOTS[lv - 1]; if (guided) casual = false;
+    App.screen(bot.name + ' bot' + (guided ? ' · guided' : casual ? ' · just play' : ''), function (v) {
       var s = E.start(), busy = false, over = false, log = [], reps = {};
       v.innerHTML = '<div class="row"><span class="pill acc">You: Red</span><span class="pill">Bot Lv ' + lv + '</span><span class="grow"></span><span class="mono small mute" id="pc"></span></div><div id="bd"></div><div id="watch"></div><div id="co"></div><div id="op" class="small mute"></div>' +
         '<div class="btns" id="bt"><button class="btn" id="hn">Hint</button><button class="btn" id="tb">Take back</button><button class="btn ghost" id="rs">Resign</button></div>';
       var co = $('#co', v), opEl = $('#op', v);
       var B = mount($('#bd', v), s, { canMove: function () { return !busy && !over && s.turn === 'r'; }, onMove: onMove });
-      co.innerHTML = casual ? '' : App.coachHTML('info', 'Your move. A classic start: cannon to the center file (b3 or h3 to e3).');
-      showWatch();
+      co.innerHTML = casual ? '' : App.coachHTML('info', guided ? '<b>Guided game.</b> Every turn the coach highlights a good move and says why. Follow it, or try your own: either way you get graded, and this game doesn’t count toward your record.' : 'Your move. A classic start: cannon to the center file (b3 or h3 to e3).');
+      showWatch(); suggest();
+      function suggest() { // guided: highlight a good move with the reason
+        if (!guided || over || s.turn !== 'r') return;
+        App.engine({ game: 'xq', op: 'best', b: s.b, turn: s.turn, ply: s.ply, depth: 3, ms: 700 }).then(function (r) {
+          if (over || s.turn !== 'r' || !r || !r.move) return; B.ui.hint = r.move; B.render(); try {
+          var note = '<b>Suggested: ' + mvText(s, r.move) + '</b> (highlighted): ' + xIdea(s, r.move, 'your', 'their') + '.';
+          var sg = v.querySelector('#sg'); if (!sg) { sg = document.createElement('div'); sg.id = 'sg'; $('#watch', v).before(sg); } sg.innerHTML = App.coachHTML('info', note); } catch (e) {} // note: App.$ returns a blank div when nothing matches
+        });
+      }
       function onMove(m) {
         var before = E.clone(s);
-        E.make(s, m); B.ui.last = m; B.ui.hint = null; B.render(); busy = true; $('#watch', v).innerHTML = '';
+        E.make(s, m); B.ui.last = m; B.ui.hint = null; B.render(); busy = true; $('#watch', v).innerHTML = ''; if (v.querySelector('#sg')) v.querySelector('#sg').innerHTML = '';
         co.innerHTML = casual ? '' : '<div class="thinking">Coach is checking your move</div>'; opEl.textContent = '';
         analyse(before, m).then(function (a) {
           log.push(a);
@@ -419,7 +457,7 @@ var XQ = (function () {
           var t = threat(s);
           opEl.innerHTML = casual ? 'Bot played <b>' + mvText(before, r.move) + '</b>.' : 'Bot played <b>' + mvText(before, r.move) + '</b>: ' + xIdea(before, r.move, 'their', 'your') + '.' + (t && t.gain >= 300 ? ' <b>Watch your ' + NAME[t.t] + '.</b>' : '');
           busy = false;
-          if (!checkEnd()) showWatch();
+          if (!checkEnd()) { showWatch(); suggest(); }
         });
       }
       function showWatch() {
@@ -448,6 +486,14 @@ var XQ = (function () {
           co.innerHTML = '<div class="panel"><h2>' + (res === 'w' ? 'You won!' : res === 'l' ? 'Bot won' : 'Draw') + '</h2><p>Casual game: nothing counted.</p></div>' + WZ.card(res === 'w' ? 'win' : 'loss', true); opEl.textContent = '';
           $('#bt', v).innerHTML = '<button class="btn primary" id="ag">Play again</button><button class="btn" id="dn">Done</button>';
           $('#ag').onclick = function () { App.checkpoint(function () { App.back(); play(lv, true); }); };
+          $('#dn').onclick = function () { App.checkpoint(App.back); };
+          return;
+        }
+        if (guided) { // practice: not on the record, no level change
+          x.guided = (x.guided || 0) + 1; App.save(); if (res === 'w') App.celebrate('xq');
+          co.innerHTML = '<div class="panel"><h2>' + (res === 'w' ? 'You won!' : res === 'l' ? 'Bot won' : 'Draw') + '</h2><p>Guided game ' + x.guided + ' done. Not counted on your record. ' + (ready() ? 'You’re ready for regular games: same bot, no suggestions.' : 'Keep going: the coach teaches the plan while you play.') + '</p></div>'; opEl.textContent = '';
+          $('#bt', v).innerHTML = '<button class="btn primary" id="ag">' + (ready() ? 'Play a regular game' : 'Another guided game') + '</button><button class="btn" id="dn">Done</button>';
+          $('#ag').onclick = function () { App.checkpoint(function () { App.back(); play(lv, false, !ready()); }); };
           $('#dn').onclick = function () { App.checkpoint(App.back); };
           return;
         }
@@ -657,16 +703,18 @@ var XQ = (function () {
   function quick() {
     var x = st(), out = [], rep = report()[0];
     var nl = LESSONS.filter(function (l) { return !x.lessons[l.id]; })[0];
-    if (nl) out.push({ label: 'Xiangqi lesson: ' + nl.t, why: 'Next step in the course.', go: function () { lesson(nl); }, quota: 2, w: 1.5 });
+    if (nl) out.push({ label: 'Xiangqi lesson: ' + nl.t, why: 'Next step in the course.', go: function () { lesson(nl); }, quota: 2, w: ready() ? 1.5 : 4 /* beginners: lessons first */ });
     var bn = BOOK.length && x.level >= 2 ? bookNext() : null;
     if (bn) out.push({ label: 'Opening book: ' + bn.o.name, why: 'Drill ' + bn.o.lines[bn.k].name + ' until you can play it clean three times.', go: function () { bookDrill(bn.o, bn.k); }, quota: 1, w: 1 });
-    if (XP.length) out.push({ label: 'Xiangqi puzzles', why: 'Rated tactics from real positions.', go: puzzles, quota: 5, w: 2.6 }); // Oct 18: Alain wants more puzzles and play
-    out.push({ label: 'Coached game vs ' + BOTS[x.level - 1].name, why: 'Every move graded in plain English.', go: function () { play(x.level); }, quota: 1, w: 2 });
+    if (XP.length) out.push({ label: 'Xiangqi puzzles', why: 'Rated tactics from real positions.', go: function () { puzzles(); }, quota: 5, w: 2.6 });
+    if (XP.some(function (p) { return p.kind === 'mate2'; }) && Object.keys(x.psolved || {}).length >= 15) out.push({ label: 'Xiangqi: mate in 2', why: 'A forcing first move, then the finish. Builds the calculation real games need.', go: function () { puzzles({ kind: 'mate2' }); }, quota: 4, w: 1.4 }); // Oct 18: Alain wants more puzzles and play
+    if (ready()) out.push({ label: 'Coached game vs ' + BOTS[x.level - 1].name, why: 'Every move graded in plain English.', go: function () { play(x.level); }, quota: 1, w: 2 });
+    else if (Object.keys(x.psolved || {}).length >= 5) out.push({ label: 'Guided game: learn to play', why: 'The coach highlights a good move every turn and says why. Doesn’t count toward your record.', go: function () { play(1, false, true); }, quota: 1, w: 1.4 });
     if (CHARS.filter(mastered).length < CHARS.length) out.push({ label: 'Piece characters', why: rep.text.indexOf('characters') >= 0 ? rep.text : 'Read the pieces without English letters.', go: charsQuiz, quota: 1, w: .8 });
     // Oct 18: Move trainer is no longer in quick play ("not guessing where pieces can move"); it stays under Pick it myself
     return out;
   }
   App.reg('xq', { home: home, place: place, report: report, quick: quick });
   if (typeof applyDistract === 'function') applyDistract(LESSONS.filter(function (l) { return l.q && l.q.length === 3; }).map(function (l) { return l.q; }), 0, 1);
-  return { book: book, bookDrill: bookDrill, wxf: wxf, BOOK: BOOK, estElo: estElo, xIdea: xIdea, analyse: analyse, makeDrill: makeDrill, home: home, lesson: lesson, LESSONS: LESSONS, playMenu: playMenu, play: play, puzzles: puzzles, charsQuiz: charsQuiz, drill: drill, BOTS: BOTS, CHARS: CHARS, mastered: mastered, hasPuzzles: function () { return XP.length > 0; } };
+  return { ready: ready, book: book, bookDrill: bookDrill, wxf: wxf, BOOK: BOOK, estElo: estElo, xIdea: xIdea, analyse: analyse, makeDrill: makeDrill, home: home, lesson: lesson, LESSONS: LESSONS, playMenu: playMenu, play: play, puzzles: puzzles, charsQuiz: charsQuiz, drill: drill, BOTS: BOTS, CHARS: CHARS, mastered: mastered, hasPuzzles: function () { return XP.length > 0; } };
 })();

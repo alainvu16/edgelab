@@ -95,12 +95,14 @@ var RM = (function () {
           selfStep('poker_online', 'Play 1,000 play-money hands online', 'Real opponents and real variance, with nothing at risk.')
         ] }
       ] },
-    xq: { name: 'Xiangqi', edge: 'In xiangqi your edge is reading the pieces instantly, knowing the main openings, and spotting cannon and horse tactics. Most casual players never learn the endgames, so knowing them wins games.',
+    xq: { ordered: true /* Oct 18: steps in order — learn the rules, puzzles, guided games, then the bot */, name: 'Xiangqi', edge: 'In xiangqi your edge is reading the pieces instantly, knowing the main openings, and spotting cannon and horse tactics. Most casual players never learn the endgames, so knowing them wins games.',
       stages: [
         { t: 'Basics', why: 'The board, every piece, and reading the characters.', steps: [
           { label: 'Rules lessons (all 7 pieces)', p: function () { return frac(XQ.LESSONS.slice(0, 6).filter(function (l) { return (S().xq.lessons || {})[l.id]; }).length, 6); }, go: function () { nextXqLesson(0, 6); } },
           { label: 'Master 8 piece characters', p: function () { return frac(XQ.CHARS.filter(XQ.mastered).length, 8); }, go: function () { XQ.charsQuiz(); } },
-          { label: 'Beat the Village bot', p: function () { return (S().xq.level || 1) > 1 ? 1 : 0; }, go: function () { XQ.play(1); } }
+          { label: 'Solve 10 puzzles', p: function () { return frac(cnt(S().xq.psolved), 10); }, go: function () { XQ.puzzles(); } },
+          { label: 'Play 2 guided games', p: function () { return frac(S().xq.guided || 0, 2); }, go: function () { XQ.play(1, false, true); } },
+          { label: 'Beat the Village bot', p: function () { return (S().xq.level || 1) > 1 ? 1 : 0; }, go: function () { XQ.ready() ? XQ.play(1) : XQ.play(1, false, true); } }
         ] },
         { t: 'Openings & tactics', why: 'Central cannon, screen horses, and the cannon-horse-chariot tactics.', steps: [
           { label: 'Opening and tactics lessons', p: function () { return frac(XQ.LESSONS.slice(6, 14).filter(function (l) { return (S().xq.lessons || {})[l.id]; }).length, 8); }, go: function () { nextXqLesson(6, 14); } },
@@ -152,7 +154,7 @@ var RM = (function () {
     return { hours: st.hoursLeft, days: Math.ceil(d), date: when.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) };
   }
   // Oct 17 ('mixed like a salad, but in order'): stages stay in order; inside the current stage, rotate among its next open steps
-  function nextStep(k) { if (!TRACKS[k]) return null; var st = trackStats(k), cur = st.done ? [] : TRACKS[k].stages[st.stage].steps.filter(function (s) { return s.go && s._p < 1; }), open = cur.length ? cur : st.next.filter(function (s) { return s.go; }); return open.length ? open[Math.floor(Math.random() * open.length)] : null; }
+  function nextStep(k) { if (!TRACKS[k]) return null; var st = trackStats(k), cur = st.done ? [] : TRACKS[k].stages[st.stage].steps.filter(function (s) { return s.go && s._p < 1; }), open = cur.length ? cur : st.next.filter(function (s) { return s.go; }); return open.length ? (TRACKS[k].ordered ? open[0] : open[Math.floor(Math.random() * open.length)]) : null; }
   var ORDER = ['mkt', 'chess', 'poker', 'xq'];
   function card(k) {
     var tr = TRACKS[k], st = trackStats(k), e = eta(st);

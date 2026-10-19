@@ -12,7 +12,9 @@ var POP = (function () {
   var MAKERS = {
     mkt: function () {
       if (typeof MK === 'undefined' || !MK.Q) return null;
-      var lv = (App.S.mkt && App.S.mkt.level) || 1, pool = MK.Q.filter(function (r) { return r[1] <= Math.min(5, lv + 1); }), r = App.freshPick('popMkt', pool.length ? pool : MK.Q, function (r) { return r[2].slice(0, 40); }, 80);
+      var lv = (App.S.mkt && App.S.mkt.level) || 1, intro = (App.S.mkt && App.S.mkt.intro) || {}, pool = MK.Q.filter(function (r) { return r[1] <= Math.min(5, lv + 1) && (typeof MKT_CARDS === 'undefined' || !MKT_CARDS[r[0]] || intro[r[0]]); }); // learn first: only topics he's been taught
+      if (!pool.length) return null;
+      var r = App.freshPick('popMkt', pool.length ? pool : MK.Q, function (r) { return r[2].slice(0, 40); }, 80);
       return { subj: 'mkt', label: 'Markets · ' + r[0], q: esc(r[2]), opts: r[3].map(function (t, i) { return { t: t, ok: i === 0 }; }), teach: r[4] || '' };
     },
     quote: function () {

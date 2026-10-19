@@ -162,6 +162,13 @@ var MK = (function () {
       clearInterval(timer);
       if (count && n >= count) return onDone(right, n);
       var m = st(), i = pickQ(), q = Q[i];
+      // Oct 18 (learn first): the first time a topic comes up, a short concept card teaches it before the first question (not in rapid fire)
+      m.intro = m.intro || {}; var cardT = typeof MKT_CARDS !== 'undefined' && MKT_CARDS[q[0]];
+      if (!rapid && cardT && !m.intro[q[0]]) {
+        container.innerHTML = '<div class="panel" style="border-color:var(--accent);gap:8px"><span class="eyebrow">New topic · learn it first</span><h2>' + esc(q[0]) + '</h2><p>' + esc(cardT.idea) + '</p><ul class="small">' + cardT.points.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul><p class="small mute">Example: ' + esc(cardT.example) + '</p></div><button class="btn primary" id="gotc" style="width:100%">Got it: ask me</button>';
+        container.querySelector('#gotc').onclick = function () { m.intro[q[0]] = Date.now(); App.save(); ask(); };
+        return;
+      }
       var order = [0, 1, 2, 3].sort(function () { return Math.random() - .5; });
       // A question you missed before comes back in a different shape (a true/false check of one answer),
       // so you have to know the idea, not remember which button was right.
