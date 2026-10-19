@@ -764,10 +764,16 @@ var App = (function () {
     var x = pool[Math.floor(Math.random() * pool.length)]; recentAdd(key, String(idOf(x)), cap); return x;
   }
   function answersToday() { return S && S.daily && S.daily.d === dayKey(new Date()) ? S.daily.n : 0; }
+  // Oct 18 (Alain: moving a piece shouldn't count toward the daily goal "unless it's just the correct move"):
+  // board moves go through coachMove — only a correct move you found yourself (best/great in games, right in drills and puzzles,
+  // no indicator, hint or learn-mode highlight) counts as an answer; other moves still get graded but don't count.
+  var moveMode = '';
+  function coachMove(grade, text, extra, helped) { moveMode = helped ? 'helped' : ({ best: 1, great: 1, right: 1 }[grade] ? 'count' : 'skip'); try { return coachHTML(grade, text, extra); } finally { moveMode = ''; } }
+  function coachNote(grade, text, extra) { return coachMove(grade, text, extra, true); } // summaries (round done, line learned, biggest swing): shown, never counted
   function coachHTML(grade, text, extra) {
-    var counted = grade && grade !== 'info' && tally();
-    if (counted && typeof EG !== 'undefined') EG.note(subjNow(), { right: 1, best: 1, great: 1, good: 1, inacc: 0.5 }[grade] || 0);
-    var fade = counted ? fadeNote(grade) : '';
+    var counted = grade && grade !== 'info' && (moveMode === 'skip' || moveMode === 'helped' ? 'nocount' : tally());
+    if (counted && moveMode !== 'helped' && typeof EG !== 'undefined') EG.note(subjNow(), { right: 1, best: 1, great: 1, good: 1, inacc: 0.5 }[grade] || 0);
+    var fade = counted === true ? fadeNote(grade) : '';
     var g = GRADES[grade] || GRADES.info;
     if (grade === 'wrong' && Date.now() - idkAt < 1500) g = ['ok', 'Here’s how it works'];
     return '<div class="coach ' + g[0] + '" data-g="' + grade + '"><div class="h"><span class="pill ' + g[0] + '">' + g[1] + '</span>' + (extra || '') + '</div><p>' + text + '</p>' + (grade !== 'info' ? '<button class="btn sm ghost simp" type="button">Explain it simpler</button><div class="simpout small" hidden></div>' : '') + fade + '</div>';
@@ -1033,7 +1039,7 @@ var App = (function () {
   }
 
   return {
-    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, rating: rating, rate: rate, ratingInfo: ratingInfo, setRating: setRating, freshPick: freshPick, recentHas: recentHas, recentAdd: recentAdd, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
+    backupScreen: backupScreen, idkBtn: idkBtn, coachFor: coachFor, coachMove: coachMove, coachNote: coachNote, rating: rating, rate: rate, ratingInfo: ratingInfo, setRating: setRating, freshPick: freshPick, recentHas: recentHas, recentAdd: recentAdd, ghGetJSON: ghGetJSON, ghConnected: function () { return !!(GH.cfg && GH.cfg.token); }, readCode: readCode, makeCode: makeCode, snapshot: snapshot, validState: validState,
     S: null, save: save, esc: esc, say: say, sayBtn: sayBtn, $: $, $$: $$, reg: reg, tab: tab, screen: screen, root: root, back: back,
     modal: modal, closeModal: closeModal, coachHTML: coachHTML, checkpoint: checkpoint, elo: elo, boot: boot,
     st: function (name) { return App.S[name]; }, engine: engine, celebrate: celebrate, quickPlay: quickPlay, playNow: playNow, playNowBtn: playNowBtn, wirePlayNow: wirePlayNow, edgeCheck: edgeCheck, setSubj: setSubj, toast: toast, qpActive: function () { return QP.active; }, hoursOf: hoursOf, HOUR_GOAL: HOUR_GOAL, activeDays: function () { return Object.keys(S.dayLog || {}).length; }, addDays: addDays, dayKey: dayKey, streak: function () { return streak(); }, totalHours: function () { var h = S.hours || {}; return Object.keys(h).reduce(function (a, k) { return a + h[k]; }, 0) / 3600000; }, X: function () { return (typeof EXTRA !== 'undefined') ? EXTRA : {}; }

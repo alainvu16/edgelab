@@ -461,7 +461,7 @@ var CZ = (function () {
         co.innerHTML = '<div class="thinking">Coach is checking</div>';
         analyse(before, r.san).then(function (a) {
           log.push(a); if (over) return;
-          co.innerHTML = App.coachHTML(a.grade, a.text);
+          co.innerHTML = App.coachMove(a.grade, a.text);
           if (check()) return;
           App.engine({ game: 'chess', op: 'best', fen: g.fen(), depth: 3, noise: 0, ms: 900 }).then(function (res) {
             if (over) return; var rr = g.move(res.move.san); B.ui.last = { from: rr.from, to: rr.to }; B.render(); busy = false;
@@ -636,7 +636,7 @@ var CZ = (function () {
             var rr = g.move(p.sol[step]); step++; busy = false;
             B.ui.last = { from: rr.from, to: rr.to }; B.ui.marks = {}; B.render();
             if (step >= p.sol.length) solved();
-            else co.innerHTML = App.coachHTML('right', 'Good. They replied ' + esc(rr.san) + '. Keep going.');
+            else co.innerHTML = App.coachMove('right', 'Good. They replied ' + esc(rr.san) + '. Keep going.', null, hints >= 2);
           }, 550);
         } else {
           B.ui.marks = {}; B.ui.marks[r.to] = 'wrong'; B.render(); busy = true;
@@ -646,7 +646,7 @@ var CZ = (function () {
             var why = esc(r.san) + ' doesn’t work here.';
             if (reply) why += ' They answer <b>' + esc(reply.move.san) + '</b>: ' + idea(g.fen(), reply.move.san, 'their', 'your') + '.';
             why += '<br><span class="mute small">Theme: ' + esc(p.th) + '. Try again.</span>';
-            co.innerHTML = App.coachHTML('wrong', why);
+            co.innerHTML = App.coachMove('wrong', why);
             setTimeout(function () { g.undo(); B.ui.marks = {}; B.ui.last = null; B.render(); busy = false; }, 900);
           });
         }
@@ -664,7 +664,7 @@ var CZ = (function () {
         c2.solved[p.id] = 1; App.save();
         var delta = c2.rating - old;
         var ckp = p.ck || creativeKind(p.fen, p.sol[0]);
-        co.innerHTML = App.coachHTML('right', explain() + (ckp ? '<br><span class="small"><b>Outside the box:</b> the key was ' + CK_TEXT[ckp] + '.</span>' : ''), '<span class="mono small">' + (delta >= 0 ? '+' : '') + delta + ' → ' + c2.rating + '</span>');
+        co.innerHTML = App.coachMove('right', explain() + (ckp ? '<br><span class="small"><b>Outside the box:</b> the key was ' + CK_TEXT[ckp] + '.</span>' : ''), '<span class="mono small">' + (delta >= 0 ? '+' : '') + delta + ' → ' + c2.rating + '</span>', hints >= 2);
         var bt = $('.btns', v);
         bt.innerHTML = opts.id ? '<button class="btn primary" id="bk2">Back to lesson</button>' : '<button class="btn primary" id="nx">Next puzzle</button>';
         if (opts.id) $('#bk2').onclick = function () { App.checkpoint(App.back); };
@@ -804,21 +804,21 @@ var CZ = (function () {
         if (r.san === line[i]) {
           i++; wrongHere = 0; B.ui.last = { from: r.from, to: r.to }; B.render(); $('#pg', v).textContent = i + '/' + line.length;
           var note = o.notes[i - 1] || cap(idea(before, r.san)) + '.';
-          co.innerHTML = App.coachHTML('right', '<b>' + esc(r.san) + '</b>. ' + esc(note));
+          co.innerHTML = App.coachMove('right', '<b>' + esc(r.san) + '</b>. ' + esc(note), null, learn);
           if (i >= line.length) finish(); else auto();
         } else {
           g.undo(); if (learn) { hintNext(); return; } misses++; wrongHere++; B.render();
           var m = line[i];
           var msg = '<b>' + esc(r.san) + '</b> isn’t the main line. In this opening the move is <b>' + (wrongHere >= 2 ? esc(m) : 'something else') + '</b>' + (wrongHere >= 2 ? ': ' + idea(before, m) + '.' : '. Think about the plan: ' + esc(o.keys[0].toLowerCase()) + '.');
           if (wrongHere >= 2) { var mm = new Chess(before).move(m); B.ui.hint = { from: mm.from, to: mm.to }; B.render(); }
-          co.innerHTML = App.coachHTML('wrong', msg);
+          co.innerHTML = App.coachMove('wrong', msg);
         }
       }
       function finish() {
         var c = st();
         if (learn) { // first pass done: now it's learned; the memory run comes next
           c.walk[wkey] = Date.now(); App.save();
-          co.innerHTML = App.coachHTML('right', 'Line learned: <b>' + esc(o.hidden || o.name) + '</b>. Now play it from memory, no highlights. Misses show you the move again.');
+          co.innerHTML = App.coachNote('right', 'Line learned: <b>' + esc(o.hidden || o.name) + '</b>. Now play it from memory, no highlights. Misses show you the move again.');
           $('#bt', v).innerHTML = '<button class="btn primary" id="mem">Play it from memory</button><button class="btn" id="dn">Later</button>';
           $('#mem').onclick = function () { App.back(); openingDrill(o); };
           $('#dn').onclick = function () { App.checkpoint(App.back); };
@@ -826,13 +826,13 @@ var CZ = (function () {
         }
         if (o.onDone) o.onDone(misses); else if (misses === 0) c.open[o.id] = Math.min(3, (c.open[o.id] || 0) + 1);
         App.save();
-        if (o.hidden) { co.innerHTML = App.coachHTML(misses ? 'good' : 'right', '<b>' + esc(o.hidden) + '</b>. ' + (misses ? misses + ' slip' + (misses > 1 ? 's' : '') + '; this line comes back sooner.' : 'Clean: this line comes back in a few days.'));
+        if (o.hidden) { co.innerHTML = App.coachNote(misses ? 'good' : 'right', '<b>' + esc(o.hidden) + '</b>. ' + (misses ? misses + ' slip' + (misses > 1 ? 's' : '') + '; this line comes back sooner.' : 'Clean: this line comes back in a few days.'));
           $('#bt', v).innerHTML = o.next ? '<button class="btn primary" id="nxl">Next line</button><button class="btn" id="dn">Stop</button>' : '<button class="btn primary" id="dn">Done</button>';
           if (o.next) $('#nxl').onclick = function () { App.checkpoint(o.next); };
           $('#dn').onclick = function () { App.checkpoint(App.back); };
           return;
         }
-        co.innerHTML = App.coachHTML(misses ? 'good' : 'right', misses ? 'Line complete with ' + misses + ' slip' + (misses > 1 ? 's' : '') + '. Run it clean to earn a star.' : 'Clean run! ' + (c.open[o.id] >= 3 ? 'Mastered.' : 'Star earned (' + c.open[o.id] + '/3).'));
+        co.innerHTML = App.coachNote(misses ? 'good' : 'right', misses ? 'Line complete with ' + misses + ' slip' + (misses > 1 ? 's' : '') + '. Run it clean to earn a star.' : 'Clean run! ' + (c.open[o.id] >= 3 ? 'Mastered.' : 'Star earned (' + c.open[o.id] + '/3).'));
         $('#bt', v).innerHTML = '<button class="btn primary" id="ag">Again</button><button class="btn" id="dn">Done</button>';
         $('#ag').onclick = function () { App.checkpoint(function () { App.back(); openingDrill(o); }); };
         $('#dn').onclick = function () { App.checkpoint(App.back); };
@@ -907,7 +907,7 @@ var CZ = (function () {
           }
           App.save();
           if (over) return;
-          if (!casual) { co.innerHTML = App.coachHTML(a.grade, a.text); moveList(); }
+          if (!casual) { co.innerHTML = App.coachMove(a.grade, a.text, null, !!assisted); moveList(); }
           if (g.game_over()) return end();
           later(botMove, 150);
         });
@@ -967,7 +967,7 @@ var CZ = (function () {
           c.lossStreak >= 2 ? 'Two losses in a row: drop a level or do puzzles on your weakest theme, then come back.' : 'Review your worst move below, then run it back.';
         co.innerHTML = '<div class="panel"><h2>' + title + '</h2><div class="stats"><div class="stat"><span class="v">' + acc + '%</span><span class="k">Accuracy</span></div>' +
           ['best', 'good', 'inacc', 'mistake', 'blunder'].map(function (k) { return '<div class="stat"><span class="v">' + (counts[k] || 0) + '</span><span class="k">' + { best: 'Best', good: 'Good', inacc: 'Inaccuracies', mistake: 'Mistakes', blunder: 'Blunders' }[k] + '</span></div>'; }).join('') +
-          '</div><p>' + rateNote + push + '</p></div>' + (worst && worst.loss > 50 ? App.coachHTML(worst.grade, '<b>Biggest swing:</b> ' + worst.text) : '') + WZ.card(res === 'w' ? (lvUp ? 'level' : 'win') : 'loss', true);
+          '</div><p>' + rateNote + push + '</p></div>' + (worst && worst.loss > 50 ? App.coachNote(worst.grade, '<b>Biggest swing:</b> ' + worst.text) : '') + WZ.card(res === 'w' ? (lvUp ? 'level' : 'win') : 'loss', true);
         opEl.textContent = '';
         $('#bt', v).innerHTML = '<button class="btn primary" id="ag">' + (lvUp ? 'Play level ' + (lv + 1) : 'Play again') + '</button><button class="btn" id="dn">Done</button>';
         $('#ag').onclick = function () { App.checkpoint(function () { App.back(); play(lvUp ? lv + 1 : lv, my); }); };
@@ -1024,7 +1024,7 @@ var CZ = (function () {
           target += ok ? step : -step; step = Math.max(80, Math.round(step * 0.7));
           target = Math.max(400, Math.min(1900, target));
           var gg = new Chess(p.fen);
-          co.innerHTML = App.coachHTML(ok ? 'right' : 'wrong', (ok ? 'Correct. ' : (san ? esc(san) + ' misses it. ' : '') + 'The answer was <b>' + esc(p.sol[0]) + '</b>: ' + idea(gg.fen(), p.sol[0]) + '. ') + 'Next one will be ' + (ok ? 'harder.' : 'easier.'));
+          co.innerHTML = App.coachMove(ok ? 'right' : 'wrong', (ok ? 'Correct. ' : (san ? esc(san) + ' misses it. ' : '') + 'The answer was <b>' + esc(p.sol[0]) + '</b>: ' + idea(gg.fen(), p.sol[0]) + '. ') + 'Next one will be ' + (ok ? 'harder.' : 'easier.'));
           $('.btns', v).innerHTML = '<button class="btn primary" id="nx">Next</button>';
           $('#nx').onclick = ask;
         }

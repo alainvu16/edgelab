@@ -40,7 +40,7 @@ var XQ = (function () {
         var act = activeChars();
         if (n >= total) {
           var m = CHARS.filter(function (c) { return (bx[c] || 0) >= 4; }).length;
-          $('#q', v).innerHTML = App.coachHTML('right', 'Round done. ' + m + ' of 14 characters mastered, ' + act.length + ' in rotation.') + '<div class="btns"><button class="btn primary" id="ag">Another round</button><button class="btn" id="dn">Done</button></div>';
+          $('#q', v).innerHTML = App.coachNote('right', 'Round done. ' + m + ' of 14 characters mastered, ' + act.length + ' in rotation.') + '<div class="btns"><button class="btn primary" id="ag">Another round</button><button class="btn" id="dn">Done</button></div>';
           $('#ag').onclick = function () { App.checkpoint(function () { App.back(); charsQuiz(); }); };
           $('#dn').onclick = function () { App.checkpoint(App.back); };
           return;
@@ -344,7 +344,7 @@ var XQ = (function () {
         var why = MOVE_WHY[d.kind];
         co.innerHTML = App.coachHTML(ok ? 'right' : 'wrong', (ok ? 'All ' + d.ans.length + ' moves found. ' : 'Green dots are the legal moves' + (extra.length ? ', red ones were not legal' : '') + '. ') + why);
         $('#sk', v).textContent = 'Streak ' + streak + '/' + need;
-        if (l && streak >= need) { st().lessons[l.id] = 1; App.save(); co.innerHTML += App.coachHTML('right', 'Lesson complete. You know how the ' + NAME[l.piece] + ' moves.'); }
+        if (l && streak >= need) { st().lessons[l.id] = 1; App.save(); co.innerHTML += App.coachNote('right', 'Lesson complete. You know how the ' + NAME[l.piece] + ' moves.'); }
         $('#ck', v).textContent = 'Next';
       };
       next();
@@ -368,13 +368,13 @@ var XQ = (function () {
       var co = $('#co', v), start = { b: p.b, turn: p.turn, hist: [], ply: 0 };
       function solved(m, pos) {
         done = true; if (first) { x.prating = App.elo(x.prating, p.rating, 1, 36); App.rate('xq', p.rating, 1, { weight: 0.2, oppRD: 150, seed: seedR, why: 'puzzle' }); } x.psolved[pick.i] = 1; App.save();
-        co.innerHTML = App.coachHTML('right', (two ? 'Checkmate. ' : '') + '<b>' + mvText(pos, m) + '</b>: ' + xIdea(pos, m) + '.', '<span class="mono small">→ ' + x.prating + '</span>');
+        co.innerHTML = App.coachMove('right', (two ? 'Checkmate. ' : '') + '<b>' + mvText(pos, m) + '</b>: ' + xIdea(pos, m) + '.', '<span class="mono small">→ ' + x.prating + '</span>');
         nextBtn();
       }
       function nextBtn() { $('.btns', v).innerHTML = '<button class="btn primary" id="nx">Next puzzle</button>'; $('#nx').onclick = function () { App.checkpoint(function () { App.back(); puzzles(opt); }); }; }
       function reply() { // the defender answers (any reply loses), then you finish it
         var rs = E.legal(s), r = rs[Math.floor(Math.random() * rs.length)], before = E.clone(s);
-        setTimeout(function () { E.make(s, r); B.ui.last = r; B.render(); stage = 1; co.innerHTML = App.coachHTML('right', 'Good: that forces it. They answered <b>' + mvText(before, r) + '</b>. Now finish: checkmate in one.'); }, 550);
+        setTimeout(function () { E.make(s, r); B.ui.last = r; B.render(); stage = 1; co.innerHTML = App.coachMove('right', 'Good: that forces it. They answered <b>' + mvText(before, r) + '</b>. Now finish: checkmate in one.'); }, 550);
       }
       var B = mount($('#bd', v), s, { flip: p.turn === 'b', canMove: function () { return !done && s.turn === p.turn; }, onMove: function (m) {
         var pos = E.clone(s), ok;
@@ -385,7 +385,7 @@ var XQ = (function () {
           E.make(s, m); B.ui.last = m; B.ui.hint = null; B.render();
           if (two && stage === 0 && E.legal(s).length) { co.innerHTML = '<div class="thinking">They look for a defense</div>'; reply(); return; }
           solved(m, pos);
-        } else { if (first) { x.prating = App.elo(x.prating, p.rating, 0, 36); App.rate('xq', p.rating, 0, { weight: 0.2, oppRD: 150, seed: seedR, why: 'puzzle' }); App.save(); } first = false; B.render(); co.innerHTML = App.coachHTML('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it. ' + (p.kind === 'win' ? 'Look for a capture or fork that wins material by force.' : two && stage === 0 ? 'Mate in 2 starts with a forcing move, usually a check, that leaves every defense losing.' : 'Look for a move after which the general has no escape and nothing can block or capture.') + ' Try again.'); }
+        } else { if (first) { x.prating = App.elo(x.prating, p.rating, 0, 36); App.rate('xq', p.rating, 0, { weight: 0.2, oppRD: 150, seed: seedR, why: 'puzzle' }); App.save(); } first = false; B.render(); co.innerHTML = App.coachMove('wrong', '<b>' + mvText(s, m) + '</b> doesn’t do it. ' + (p.kind === 'win' ? 'Look for a capture or fork that wins material by force.' : two && stage === 0 ? 'Mate in 2 starts with a forcing move, usually a check, that leaves every defense losing.' : 'Look for a move after which the general has no escape and nothing can block or capture.') + ' Try again.'); }
       } });
       co.innerHTML = App.coachHTML('info', p.kind === 'mate' ? 'Find the checkmate in one move.' : two ? 'Checkmate in two moves: find a forcing first move. Whatever they answer, you mate next.' : 'Find the move that wins material.');
       function hintMove() { return two && stage === 1 ? mateIn1(s)[0] : two ? (E.legal(s).filter(function (m) { return forcesMate2(s, m); })[0] || p.sol[0]) : p.sol[0]; }
@@ -445,7 +445,7 @@ var XQ = (function () {
           log.push(a);
           if (!casual && (a.grade === 'mistake' || a.grade === 'blunder')) { var xx = st(); xx.err = xx.err || { hang: 0, mate: 0, other: 0 }; xx.err[/hanging/.test(a.text) ? 'hang' : /checkmate/.test(a.text) ? 'mate' : 'other']++; App.save(); }
           if (over) return;
-          if (!casual) co.innerHTML = App.coachHTML(a.grade, a.text);
+          if (!casual) co.innerHTML = App.coachMove(a.grade, a.text, null, !!(assisted || guided));
           $('#pc', v).textContent = 'Move ' + Math.ceil(s.ply / 2);
           if (checkEnd()) return;
           setTimeout(botMove, 150);
@@ -514,7 +514,7 @@ var XQ = (function () {
         var worst = log.slice().sort(function (a, b) { return b.loss - a.loss; })[0];
         co.innerHTML = '<div class="panel"><h2>' + (res === 'w' ? 'You won!' : res === 'l' ? 'Bot won' : 'Draw') + '</h2><div class="stats"><div class="stat"><span class="v">' + acc + '%</span><span class="k">Accuracy</span></div><div class="stat"><span class="v">' + log.length + '</span><span class="k">Your moves</span></div></div><p>' +
           rateNote + (lvUp ? 'Level ' + (lv + 1) + ' unlocked. It looks deeper, so slow down on captures.' : res === 'w' ? (lv === x.level && lv < MAXLV ? 'One more win here unlocks level ' + (lv + 1) + '.' : 'Try a higher level.') : 'Read your biggest swing below and run it back.') + '</p></div>' +
-          (worst && worst.loss > 50 ? App.coachHTML(worst.grade, '<b>Biggest swing:</b> ' + worst.text) : '') + WZ.card(res === 'w' ? (lvUp ? 'level' : 'win') : 'loss', true);
+          (worst && worst.loss > 50 ? App.coachNote(worst.grade, '<b>Biggest swing:</b> ' + worst.text) : '') + WZ.card(res === 'w' ? (lvUp ? 'level' : 'win') : 'loss', true);
         opEl.textContent = '';
         $('#bt', v).innerHTML = '<button class="btn primary" id="ag">' + (lvUp ? 'Play level ' + (lv + 1) : 'Play again') + '</button><button class="btn" id="dn">Done</button>';
         $('#ag').onclick = function () { App.checkpoint(function () { App.back(); play(lvUp ? lv + 1 : lv); }); };
@@ -674,20 +674,20 @@ var XQ = (function () {
         if (same(m, mv[i])) {
           E.make(s, m); B.ui.last = m; B.ui.hint = null; i++; wrong = 0; B.render(); $('#pg', v).textContent = i + '/' + mv.length;
           var note = (line.notes || {})[i - 1];
-          co.innerHTML = App.coachHTML('right', '<b>' + esc(line.moves[i - 1]) + '</b>' + (note ? '. ' + esc(note) : '.'));
+          co.innerHTML = App.coachMove('right', '<b>' + esc(line.moves[i - 1]) + '</b>' + (note ? '. ' + esc(note) : '.'), null, learn);
           if (i >= mv.length) finish(); else auto();
         } else {
           if (learn) { hintNext(); return; }
           misses++; wrong++;
           if (wrong >= 2) { B.ui.hint = mv[i]; B.render(); }
-          co.innerHTML = App.coachHTML('wrong', 'Not the book move here. ' + (wrong >= 2 ? 'It’s <b>' + esc(line.moves[i]) + '</b> (highlighted).' : 'Think about the plan: ' + esc(o.keys[0]) + '.'));
+          co.innerHTML = App.coachMove('wrong', 'Not the book move here. ' + (wrong >= 2 ? 'It’s <b>' + esc(line.moves[i]) + '</b> (highlighted).' : 'Think about the plan: ' + esc(o.keys[0]) + '.'));
         }
       }
       function finish() {
         var bk = bst(), key = o.id + ':' + li;
         if (learn) {
           bk[wkey] = Date.now(); App.save();
-          co.innerHTML = App.coachHTML('right', 'Line learned: <b>' + esc(line.name) + '</b>. Now play it from memory, no highlights.');
+          co.innerHTML = App.coachNote('right', 'Line learned: <b>' + esc(line.name) + '</b>. Now play it from memory, no highlights.');
           $('#bt', v).innerHTML = '<button class="btn primary" id="mem">Play it from memory</button><button class="btn" id="dn">Later</button>';
           $('#mem', v).onclick = function () { App.back(); bookDrill(o, li); };
           $('#dn', v).onclick = function () { App.checkpoint(App.back); };
@@ -695,7 +695,7 @@ var XQ = (function () {
         }
         if (!misses) bk[key] = Math.min(3, (bk[key] || 0) + 1);
         App.save();
-        co.innerHTML = App.coachHTML(misses ? 'good' : 'right', misses ? 'Line done with ' + misses + ' slip' + (misses > 1 ? 's' : '') + '. Run it clean for a star.' : 'Clean run! ' + (bk[key] >= 3 ? 'Mastered.' : 'Star earned (' + bk[key] + '/3).'));
+        co.innerHTML = App.coachNote(misses ? 'good' : 'right', misses ? 'Line done with ' + misses + ' slip' + (misses > 1 ? 's' : '') + '. Run it clean for a star.' : 'Clean run! ' + (bk[key] >= 3 ? 'Mastered.' : 'Star earned (' + bk[key] + '/3).'));
         $('#bt', v).innerHTML = '<button class="btn primary" id="ag">Again</button><button class="btn" id="dn">Done</button>';
         $('#ag', v).onclick = function () { App.checkpoint(function () { App.back(); bookDrill(o, li); }); };
         $('#dn', v).onclick = function () { App.checkpoint(App.back); };
