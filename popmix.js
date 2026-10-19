@@ -38,8 +38,11 @@ var POP = (function () {
       // never a mastered word that isn't due. Area: one with the most still to do, rotating among those with work.
       var areas = ['Poker', 'Trading', 'Chess', 'Xiangqi', 'Everyday'].filter(function (a) { return GL.left(a) > 0; });
       if (!areas.length) return null;
-      var area = areas[(App.S.popWA = ((App.S.popWA || 0) + 1)) % areas.length], skip = (App.S.recent && App.S.recent.popWord || []).map(Number);
-      var cand = GL.plan(area, skip); if (!cand.length) cand = GL.plan(area); if (!cand.length) return null;
+      var skip = (App.S.recent && App.S.recent.popWord || []).map(Number), notNew = function (i) { return !GL.isNew(i); }, cand = [], start = (App.S.popWA = (App.S.popWA || 0) + 1);
+      [skip, null].forEach(function (sk) { // rotate areas, first skipping words asked lately; pop-ups never quiz a word you haven't been shown yet
+        for (var a = 0; a < areas.length && !cand.length; a++) cand = GL.plan(areas[(start + a) % areas.length], sk).filter(notNew);
+      });
+      if (!cand.length) return null;
       var i0 = cand[0]; App.recentAdd('popWord', String(i0), 30);
       var x = GL.T[i0], others = shuf(GL.T.filter(function (y) { return y !== x && y[2] === x[2]; })).slice(0, 3);
       if (others.length < 3) others = shuf(GL.T.filter(function (y) { return y !== x; })).slice(0, 3);

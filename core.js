@@ -522,7 +522,7 @@ var App = (function () {
     ['chess', 'xq', 'poker', 'mkt'].forEach(function (k) {
       if (!mods[k] || !mods[k].quick || k === QP.last) return;
       var sev = 0; try { sev = mods[k].report()[0].sev || 0; } catch (e) {}
-      var score = (1 - Math.min(1, Math.max(0, prog[k]))) * 0.8 + Math.min(1, sev) * 0.8 - (QP.blocks[k] || 0) * 0.45 - hoursOf(k) / HOUR_GOAL * 0.3 + Math.random() * 0.35;
+      var score = (1 - Math.min(1, Math.max(0, prog[k]))) * 0.8 + Math.min(1, sev) * 0.8 - (QP.blocks[k] || 0) * 0.45 - hoursOf(k) / HOUR_GOAL * 0.3 + Math.random() * 0.35 + (k === 'chess' ? 0.3 : 0); // Oct 18: chess is his favorite, so it comes up a bit more
       if (!best || score > best.score) best = { k: k, score: score };
     });
     /* Oct 17: learn in order — 8 of 10 picks are the next step on the path, the rest is variety */ if (typeof RM !== 'undefined' && Math.random() < 0.8) { try { var ns = RM.nextStep(best.k); if (ns && !recentHas('qpLabel', ns.label)) return { k: best.k, label: ns.label, why: 'Next step on your path to an edge.', go: ns.go, quota: 3 }; } catch (e) {} }

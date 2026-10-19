@@ -401,6 +401,14 @@ var GL = (function () {
           return;
         }
         var i = p[0], t = T[i]; recent.push(i);
+        if (isNew(i)) { // Oct 18: learn first — a new word is shown with its meaning before you're ever quizzed on it
+          var gn = gst(); gn.box[i] = 0; gn.seen[i] = Date.now(); App.save();
+          v.innerHTML = '<div class="row"><span class="pill acc">' + (n + 1) + ' / ' + N + '</span><span class="pill">' + focus + '</span><span class="grow"></span><span class="small mute">New word</span></div>' +
+            '<div class="panel" style="border-color:var(--accent);gap:8px"><span class="eyebrow">New word · learn it first</span><h2 style="font-size:24px">' + App.esc(t[0]) + App.sayBtn(t[0]) + '</h2><p>' + App.esc(t[3]) + '</p>' + (t[4] ? '<p class="mute">Example: ' + App.esc(t[4]) + '</p>' : '') + '</div>' +
+            '<button class="btn primary" id="nx" style="width:100%">Got it</button><p class="small mute">It comes back as a question in a few minutes, then less and less as you get it right.</p>';
+          $('#nx', v).onclick = function () { n++; ask(); };
+          return;
+        }
         // never repeat a word within a few questions, but small areas (Xiangqi) need room to rotate
         var areaSize = T.filter(function (x) { return x[2].indexOf(focus) >= 0; }).length;
         while (recent.length > Math.min(4, Math.max(1, areaSize - 2))) recent.shift();

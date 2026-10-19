@@ -304,9 +304,10 @@ var XQ = (function () {
       } else $('#go', v).onclick = function () { drill(l); };
     });
   }
+  var MOVE_WHY = { K: 'The general moves one point along a line and must stay in the palace. It also can’t step onto a file facing the other general.', A: 'Advisors move one point diagonally, only inside the palace.', E: 'Elephants move two points diagonally, can’t cross the river, and are blocked if the midpoint is occupied.', H: 'The horse goes one straight then one diagonal. If the straight point is occupied, that direction is blocked.', R: 'The chariot slides any distance until it hits a piece. It can capture the first enemy piece it meets.', C: 'The cannon slides like a chariot, but to capture it must jump exactly one piece.', P: 'Soldiers move forward one point; after crossing the river they may also step sideways.' };
   function drill(l) {
     App.screen(l ? 'Drill: ' + NAME[l.piece] : 'Move trainer', function (v) {
-      var x = st(), streak = 0, need = 5, d, picked, done;
+      var x = st(), streak = 0, need = 3, d, picked, done; x.moveSeen = x.moveSeen || {}; // Oct 18: learn first, then 3 in a row (was 5)
       v.innerHTML = '<div class="row"><span class="pill acc" id="pk"></span><span class="pill" id="sk"></span></div><p class="mute small">Tap every point the highlighted piece can move to, then press Check.</p><div id="bd"></div><div id="co"></div><div class="btns"><button class="btn primary" id="ck">Check</button></div>';
       var co = $('#co', v);
       function next() {
@@ -317,6 +318,12 @@ var XQ = (function () {
         $('#sk', v).textContent = 'Streak ' + streak + '/' + need;
         draw(); co.innerHTML = '';
         $('#ck', v).textContent = 'Check';
+        if (!x.moveSeen[kind]) { // first time with this piece: show every legal move before asking
+          done = true; B.ui.targets = []; B.ui.marks = {}; d.ans.forEach(function (a) { B.ui.marks[a] = 'right'; }); B.render();
+          co.innerHTML = App.coachHTML('info', '<b>Learn it first: the ' + NAME[kind] + '.</b> The green dots are every point it can move to from here. ' + MOVE_WHY[kind] + ' Your turn next.');
+          $('#ck', v).textContent = 'Got it, my turn';
+          x.moveSeen[kind] = 1; App.save();
+        }
       }
       var B;
       function draw() {
@@ -335,7 +342,7 @@ var XQ = (function () {
         if (ok) { streak++; x.drill[d.kind] = Math.min(6, (x.drill[d.kind] || 0) + 1); }
         else { streak = 0; x.drill[d.kind] = Math.max(0, (x.drill[d.kind] || 0) - 1); }
         App.save();
-        var why = { K: 'The general moves one point along a line and must stay in the palace. It also can’t step onto a file facing the other general.', A: 'Advisors move one point diagonally, only inside the palace.', E: 'Elephants move two points diagonally, can’t cross the river, and are blocked if the midpoint is occupied.', H: 'The horse goes one straight then one diagonal. If the straight point is occupied, that direction is blocked.', R: 'The chariot slides any distance until it hits a piece. It can capture the first enemy piece it meets.', C: 'The cannon slides like a chariot, but to capture it must jump exactly one piece.', P: 'Soldiers move forward one point; after crossing the river they may also step sideways.' }[d.kind];
+        var why = MOVE_WHY[d.kind];
         co.innerHTML = App.coachHTML(ok ? 'right' : 'wrong', (ok ? 'All ' + d.ans.length + ' moves found. ' : 'Green dots are the legal moves' + (extra.length ? ', red ones were not legal' : '') + '. ') + why);
         $('#sk', v).textContent = 'Streak ' + streak + '/' + need;
         if (l && streak >= need) { st().lessons[l.id] = 1; App.save(); co.innerHTML += App.coachHTML('right', 'Lesson complete. You know how the ' + NAME[l.piece] + ' moves.'); }
@@ -590,7 +597,7 @@ var XQ = (function () {
           co.innerHTML = App.coachHTML('info', '<b>' + Math.ceil(i / 2) + '. ' + esc(line.moves[i - 1]) + '</b> (' + who + ')' + (note ? '. ' + esc(note) : '.'));
         }
         function replay(k) { s = E.start(); for (var j = 0; j < k; j++) E.make(s, mv[j]); B = mount($('#bd', v), s, { flip: o.side === 'b', canMove: function () { return false; }, onMove: function () {} }); B.ui.last = k ? mv[k - 1] : null; B.render(); }
-        $('#nx', v).onclick = function () { if (i < mv.length) { i++; replay(i); show(); } };
+        $('#nx', v).onclick = function () { if (i < mv.length) { i++; replay(i); show(); if (i === mv.length) { var bw = bst(); bw['walk:' + o.id + ':' + li] = bw['walk:' + o.id + ':' + li] || Date.now(); App.save(); } } };
         $('#pv', v).onclick = function () { if (i > 0) { i--; replay(i); show(); } };
         $('#dr', v).onclick = function () { bookDrill(o, li); };
         $$('[data-li]', v).forEach(function (b) { b.onclick = function () { li = +b.dataset.li; draw(); }; });
@@ -602,12 +609,15 @@ var XQ = (function () {
   function bookDrill(o, li) {
     App.screen('Drill: ' + o.name, function (v) {
       var line = o.lines[li], mv = line.mv, s = E.start(), i = 0, misses = 0, busy = false, wrong = 0, my = o.side;
+      // Oct 18: learn a line with arrows and explanations first; play it from memory after that
+      var bk0 = bst(), wkey = 'walk:' + o.id + ':' + li, learn = !bk0[wkey] && !(bk0[o.id + ':' + li] > 0);
+      function hintNext() { if (learn && i < mv.length && s.turn === my) { B.ui.hint = mv[i]; B.render(); var note = (line.notes || {})[i]; co.innerHTML = App.coachHTML('info', '<b>Learn it first.</b> Your move: <b>' + esc(line.moves[i]) + '</b> (follow the highlight)' + (note ? '. ' + esc(note) : '.')); } }
       v.innerHTML = '<div class="row"><span class="pill acc">You play ' + (my === 'r' ? 'Red' : 'Black') + '</span><span class="pill" id="pg">0/' + mv.length + '</span></div><div id="bd"></div><div id="co"></div><div class="btns" id="bt"></div>';
       var co = $('#co', v), B = mount($('#bd', v), s, { flip: my === 'b', canMove: function () { return !busy && s.turn === my && i < mv.length; }, onMove: onMove });
-      co.innerHTML = App.coachHTML('info', 'Play ' + esc(line.name) + '. The other side is played for you.');
+      co.innerHTML = App.coachHTML('info', learn ? '<b>New line: learn it first.</b> Follow the highlighted moves; next time you play ' + esc(line.name) + ' from memory.' : 'Play ' + esc(line.name) + ' from memory. The other side is played for you.');
       function same(a, b) { return a.f === b.f && a.t === b.t; }
       function auto() {
-        if (i < mv.length && s.turn !== my) { busy = true; setTimeout(function () { E.make(s, mv[i]); B.ui.last = mv[i]; i++; B.render(); $('#pg', v).textContent = i + '/' + mv.length; busy = false; if (i >= mv.length) finish(); }, 450); }
+        if (i < mv.length && s.turn !== my) { busy = true; setTimeout(function () { E.make(s, mv[i]); B.ui.last = mv[i]; i++; B.render(); $('#pg', v).textContent = i + '/' + mv.length; busy = false; if (i >= mv.length) finish(); else hintNext(); }, learn ? 700 : 450); }
       }
       function onMove(m) {
         if (same(m, mv[i])) {
@@ -616,6 +626,7 @@ var XQ = (function () {
           co.innerHTML = App.coachHTML('right', '<b>' + esc(line.moves[i - 1]) + '</b>' + (note ? '. ' + esc(note) : '.'));
           if (i >= mv.length) finish(); else auto();
         } else {
+          if (learn) { hintNext(); return; }
           misses++; wrong++;
           if (wrong >= 2) { B.ui.hint = mv[i]; B.render(); }
           co.innerHTML = App.coachHTML('wrong', 'Not the book move here. ' + (wrong >= 2 ? 'It’s <b>' + esc(line.moves[i]) + '</b> (highlighted).' : 'Think about the plan: ' + esc(o.keys[0]) + '.'));
@@ -623,6 +634,14 @@ var XQ = (function () {
       }
       function finish() {
         var bk = bst(), key = o.id + ':' + li;
+        if (learn) {
+          bk[wkey] = Date.now(); App.save();
+          co.innerHTML = App.coachHTML('right', 'Line learned: <b>' + esc(line.name) + '</b>. Now play it from memory, no highlights.');
+          $('#bt', v).innerHTML = '<button class="btn primary" id="mem">Play it from memory</button><button class="btn" id="dn">Later</button>';
+          $('#mem', v).onclick = function () { App.back(); bookDrill(o, li); };
+          $('#dn', v).onclick = function () { App.checkpoint(App.back); };
+          return;
+        }
         if (!misses) bk[key] = Math.min(3, (bk[key] || 0) + 1);
         App.save();
         co.innerHTML = App.coachHTML(misses ? 'good' : 'right', misses ? 'Line done with ' + misses + ' slip' + (misses > 1 ? 's' : '') + '. Run it clean for a star.' : 'Clean run! ' + (bk[key] >= 3 ? 'Mastered.' : 'Star earned (' + bk[key] + '/3).'));
@@ -630,7 +649,7 @@ var XQ = (function () {
         $('#ag', v).onclick = function () { App.checkpoint(function () { App.back(); bookDrill(o, li); }); };
         $('#dn', v).onclick = function () { App.checkpoint(App.back); };
       }
-      auto();
+      if (my === s.turn) hintNext(); auto();
     });
   }
   function bookNext() { var bk = bst(), best = null; BOOK.forEach(function (o) { o.lines.forEach(function (l, k) { var b = bk[o.id + ':' + k] || 0; if (b < 3 && (!best || b < best.b || (b === best.b && o.lv < best.o.lv))) best = { o: o, k: k, b: b }; }); }); return best; }
@@ -641,13 +660,13 @@ var XQ = (function () {
     if (nl) out.push({ label: 'Xiangqi lesson: ' + nl.t, why: 'Next step in the course.', go: function () { lesson(nl); }, quota: 2, w: 1.5 });
     var bn = BOOK.length && x.level >= 2 ? bookNext() : null;
     if (bn) out.push({ label: 'Opening book: ' + bn.o.name, why: 'Drill ' + bn.o.lines[bn.k].name + ' until you can play it clean three times.', go: function () { bookDrill(bn.o, bn.k); }, quota: 1, w: 1 });
-    if (XP.length) out.push({ label: 'Xiangqi puzzles', why: 'Rated tactics from real positions.', go: puzzles, quota: 5, w: 1.3 });
-    out.push({ label: 'Coached game vs ' + BOTS[x.level - 1].name, why: 'Every move graded in plain English.', go: function () { play(x.level); }, quota: 1, w: 1 });
+    if (XP.length) out.push({ label: 'Xiangqi puzzles', why: 'Rated tactics from real positions.', go: puzzles, quota: 5, w: 2.6 }); // Oct 18: Alain wants more puzzles and play
+    out.push({ label: 'Coached game vs ' + BOTS[x.level - 1].name, why: 'Every move graded in plain English.', go: function () { play(x.level); }, quota: 1, w: 2 });
     if (CHARS.filter(mastered).length < CHARS.length) out.push({ label: 'Piece characters', why: rep.text.indexOf('characters') >= 0 ? rep.text : 'Read the pieces without English letters.', go: charsQuiz, quota: 1, w: .8 });
-    out.push({ label: 'Move trainer', why: 'Tap every legal move; builds board sight.', go: function () { drill(null); }, quota: 4, w: .6 });
+    // Oct 18: Move trainer is no longer in quick play ("not guessing where pieces can move"); it stays under Pick it myself
     return out;
   }
   App.reg('xq', { home: home, place: place, report: report, quick: quick });
   if (typeof applyDistract === 'function') applyDistract(LESSONS.filter(function (l) { return l.q && l.q.length === 3; }).map(function (l) { return l.q; }), 0, 1);
-  return { book: book, wxf: wxf, BOOK: BOOK, estElo: estElo, xIdea: xIdea, analyse: analyse, makeDrill: makeDrill, home: home, lesson: lesson, LESSONS: LESSONS, playMenu: playMenu, play: play, puzzles: puzzles, charsQuiz: charsQuiz, drill: drill, BOTS: BOTS, CHARS: CHARS, mastered: mastered, hasPuzzles: function () { return XP.length > 0; } };
+  return { book: book, bookDrill: bookDrill, wxf: wxf, BOOK: BOOK, estElo: estElo, xIdea: xIdea, analyse: analyse, makeDrill: makeDrill, home: home, lesson: lesson, LESSONS: LESSONS, playMenu: playMenu, play: play, puzzles: puzzles, charsQuiz: charsQuiz, drill: drill, BOTS: BOTS, CHARS: CHARS, mastered: mastered, hasPuzzles: function () { return XP.length > 0; } };
 })();

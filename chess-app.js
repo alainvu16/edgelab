@@ -749,7 +749,7 @@ var CZ = (function () {
     function next() {
       if (k >= pool.length) { App.toast('Repertoire test done'); return; }
       var l = pool[k++];
-      openingDrill({ id: 'rep:' + l.key, name: 'Repertoire test ' + k + '/' + pool.length, side: l.o.side, moves: l.moves, notes: l.notes, hidden: l.name,
+      openingDrill({ id: 'rep:' + l.key, learnKey: 'rep:' + l.key, name: 'Repertoire test ' + k + '/' + pool.length, side: l.o.side, moves: l.moves, notes: l.notes, hidden: l.name,
         onDone: function (misses) { var x = r.box[l.key] || { b: 0, at: 0 }; x.b = misses ? Math.max(0, x.b - 1) : Math.min(5, x.b + 1); x.at = Date.now(); r.box[l.key] = x; App.save(); },
         next: k < pool.length ? function () { App.back(); next(); } : null });
     }
@@ -769,7 +769,7 @@ var CZ = (function () {
         var note = o.notes[i - 1] || cap(idea(gb.fen(), line[i - 1])) + '.';
         co.innerHTML = App.coachHTML('info', '<b>' + Math.ceil(i / 2) + (who === 'White' ? '. ' : '… ') + esc(line[i - 1]) + '</b> (' + who + '). ' + esc(note).replace(/&lt;b&gt;|&lt;\/b&gt;/g, ''));
       }
-      $('#nx', v).onclick = function () { if (i < line.length) { var r = g.move(line[i]); i++; B.ui.last = { from: r.from, to: r.to }; B.render(); show(); } };
+      $('#nx', v).onclick = function () { if (i < line.length) { var r = g.move(line[i]); i++; B.ui.last = { from: r.from, to: r.to }; B.render(); show(); if (i === line.length) { var cw = st(); cw.walk = cw.walk || {}; cw.walk[o.id] = cw.walk[o.id] || Date.now(); App.save(); } } };
       $('#pv', v).onclick = function () { if (i > 0) { g.undo(); i--; var h = g.history({ verbose: true }); B.ui.last = h.length ? h[h.length - 1] : null; B.render(); show(); } };
       $('#dr', v).onclick = function () { openingDrill(o); };
       show();
@@ -778,15 +778,19 @@ var CZ = (function () {
   function openingDrill(o) {
     App.screen('Drill: ' + o.name, function (v) {
       var g = new Chess(), line = o.moves.split(' '), i = 0, misses = 0, busy = false, wrongHere = 0;
-      var my = o.side;
+      var my = o.side, c0 = st(); c0.walk = c0.walk || {};
+      // Oct 18 (Alain: "teach me the openings before having me guess"): the first time through a line you follow arrows with
+      // every move explained; only after that does the app ask you to play it from memory
+      var wkey = o.learnKey || o.id, learn = !c0.walk[wkey] && !(c0.open[o.id] > 0);
+      function hintNext() { if (learn && i < line.length && g.turn() === my) { var m = new Chess(g.fen()).move(line[i]); B.ui.hint = { from: m.from, to: m.to }; B.render(); co.innerHTML = App.coachHTML('info', '<b>Learn it first.</b> Your move: <b>' + esc(line[i]) + '</b> (tap the two highlighted squares). ' + esc(o.notes[i] || cap(idea(g.fen(), line[i])) + '.')); } }
       v.innerHTML = '<div class="row"><span class="pill acc">You play ' + (my === 'w' ? 'White' : 'Black') + '</span><span class="pill" id="pg">0/' + line.length + '</span></div><div id="bd"></div><div id="co"></div><div class="btns" id="bt"></div>';
       var co = $('#co', v);
       var B = mount($('#bd', v), g, { flip: my === 'b', canMove: function () { return !busy && g.turn() === my && i < line.length; }, onMove: onMove });
-      co.innerHTML = App.coachHTML('info', o.hidden ? 'Play your repertoire. The other side may leave the main line: recognize it and answer.' : 'Play the main line of the ' + esc(o.name) + '. The other side is played for you.');
+      co.innerHTML = App.coachHTML('info', learn ? '<b>New line: learn it first.</b> Tap the highlighted squares; every move is explained. Next time you play it from memory.' + (o.hidden ? ' This one is <b>' + esc(o.hidden) + '</b>.' : '') : o.hidden ? 'Play your repertoire. The other side may leave the main line: recognize it and answer.' : 'Play the main line of the ' + esc(o.name) + '. The other side is played for you.');
       function auto() {
         if (i < line.length && g.turn() !== my) {
           busy = true;
-          setTimeout(function () { var r = g.move(line[i]); i++; B.ui.last = { from: r.from, to: r.to }; B.render(); $('#pg', v).textContent = i + '/' + line.length; busy = false; if (i >= line.length) finish(); }, 450);
+          setTimeout(function () { var r = g.move(line[i]); i++; B.ui.last = { from: r.from, to: r.to }; B.render(); $('#pg', v).textContent = i + '/' + line.length; busy = false; if (i >= line.length) finish(); else hintNext(); }, learn ? 700 : 450);
         }
       }
       function onMove(mv) {
@@ -797,7 +801,7 @@ var CZ = (function () {
           co.innerHTML = App.coachHTML('right', '<b>' + esc(r.san) + '</b>. ' + esc(note));
           if (i >= line.length) finish(); else auto();
         } else {
-          g.undo(); misses++; wrongHere++; B.render();
+          g.undo(); if (learn) { hintNext(); return; } misses++; wrongHere++; B.render();
           var m = line[i];
           var msg = '<b>' + esc(r.san) + '</b> isn’t the main line. In this opening the move is <b>' + (wrongHere >= 2 ? esc(m) : 'something else') + '</b>' + (wrongHere >= 2 ? ': ' + idea(before, m) + '.' : '. Think about the plan: ' + esc(o.keys[0].toLowerCase()) + '.');
           if (wrongHere >= 2) { var mm = new Chess(before).move(m); B.ui.hint = { from: mm.from, to: mm.to }; B.render(); }
@@ -806,6 +810,14 @@ var CZ = (function () {
       }
       function finish() {
         var c = st();
+        if (learn) { // first pass done: now it's learned; the memory run comes next
+          c.walk[wkey] = Date.now(); App.save();
+          co.innerHTML = App.coachHTML('right', 'Line learned: <b>' + esc(o.hidden || o.name) + '</b>. Now play it from memory, no highlights. Misses show you the move again.');
+          $('#bt', v).innerHTML = '<button class="btn primary" id="mem">Play it from memory</button><button class="btn" id="dn">Later</button>';
+          $('#mem').onclick = function () { App.back(); openingDrill(o); };
+          $('#dn').onclick = function () { App.checkpoint(App.back); };
+          return;
+        }
         if (o.onDone) o.onDone(misses); else if (misses === 0) c.open[o.id] = Math.min(3, (c.open[o.id] || 0) + 1);
         App.save();
         if (o.hidden) { co.innerHTML = App.coachHTML(misses ? 'good' : 'right', '<b>' + esc(o.hidden) + '</b>. ' + (misses ? misses + ' slip' + (misses > 1 ? 's' : '') + '; this line comes back sooner.' : 'Clean: this line comes back in a few days.'));
@@ -819,7 +831,7 @@ var CZ = (function () {
         $('#ag').onclick = function () { App.checkpoint(function () { App.back(); openingDrill(o); }); };
         $('#dn').onclick = function () { App.checkpoint(App.back); };
       }
-      auto();
+      if (my === 'w') hintNext(); auto();
     });
   }
 
@@ -1034,7 +1046,7 @@ var CZ = (function () {
     var eg = Object.keys(ENDG).filter(function (k) { return !(c.endg || {})[k]; })[0];
     if (eg && c.rating >= 850) out.push({ label: 'Endgame: ' + ENDG[eg].t, why: ENDG[eg].goalText + '.', go: function () { endgame(eg); }, quota: 1, w: .8 });
     var op = OPS.slice().sort(function (a, b) { return (c.open[a.id] || 0) - (c.open[b.id] || 0); })[0];
-    if (op && (c.open[op.id] || 0) < 3) out.push({ label: 'Opening drill: ' + op.name, why: 'Clean runs earn stars; three stars masters the line.', go: function () { openingDrill(op); }, quota: 2, w: .7 });
+    if (op && (c.open[op.id] || 0) < 3) out.push({ label: ((c.walk || {})[op.id] || c.open[op.id] ? 'Opening drill: ' : 'Learn the opening: ') + op.name, why: 'Clean runs earn stars; three stars masters the line.', go: function () { openingDrill(op); }, quota: 2, w: .7 });
     out.push({ label: 'Outside-the-box puzzles', why: 'Quiet moves and sacrifices: the moves most players never look at.', go: function () { puzzles({ creative: true }); }, quota: 4, w: .9 });
     out.push({ label: 'Board vision', why: 'Name squares fast; it speeds up every calculation.', go: vision, quota: 1, w: .4 });
     return out;
